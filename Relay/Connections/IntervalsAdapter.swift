@@ -115,8 +115,11 @@ private struct IntervalsActivity: Decodable {
     let average_heartrate: Double?
     let max_heartrate: Double?
     let average_watts: Double?
+    let max_watts: Double?
+    let normalized_power: Double?       // Intervals.icu NP field
     let average_cadence: Double?
     let average_speed: Double?
+    let max_speed: Double?
     let trainer: Bool?
     let calories: Int?
 
@@ -137,8 +140,11 @@ private struct IntervalsActivity: Decodable {
             avgHeartRate: average_heartrate,
             maxHeartRate: max_heartrate,
             avgPower: average_watts,
+            maxPower: max_watts,
+            normalizedPower: normalized_power,
             avgCadence: average_cadence,
             avgSpeed: average_speed,
+            maxSpeed: max_speed,
             elevationGain: total_elevation_gain
         )
     }

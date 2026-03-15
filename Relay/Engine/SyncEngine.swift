@@ -102,8 +102,11 @@ final class SyncEngine: ObservableObject {
             r.avgHeartRate = merged.avgHeartRate
             r.maxHeartRate = merged.maxHeartRate
             r.avgPower = merged.avgPower
+            r.maxPower = merged.maxPower
+            r.normalizedPower = merged.normalizedPower
             r.avgCadence = merged.avgCadence
             r.avgSpeed = merged.avgSpeed
+            r.maxSpeed = merged.maxSpeed
             r.elevationGain = merged.elevationGain
             context.insert(r)
             return r
@@ -160,8 +163,11 @@ extension WorkoutRecord {
             avgHeartRate: avgHeartRate,
             maxHeartRate: maxHeartRate,
             avgPower: avgPower,
+            maxPower: maxPower,
+            normalizedPower: normalizedPower,
             avgCadence: avgCadence,
             avgSpeed: avgSpeed,
+            maxSpeed: maxSpeed,
             elevationGain: elevationGain
         )
     }

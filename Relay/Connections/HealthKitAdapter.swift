@@ -3,7 +3,8 @@
 //  Relay
 //
 //  Adapter for Apple HealthKit. Fetches workouts and writes them back.
-//  Requests read+write auth for workouts, active energy, heart rate, and distance.
+//  Requests read+write auth for workouts, active energy, heart rate, distance,
+//  and cycling/running power, cadence, and speed (iOS 16-17+).
 //
 
 import Foundation
@@ -36,7 +37,14 @@ actor HealthKitAdapter: ConnectionAdapter {
             HKQuantityType(.heartRate),
             HKQuantityType(.distanceWalkingRunning),
             HKQuantityType(.distanceCycling),
-            HKQuantityType(.distanceSwimming)
+            HKQuantityType(.distanceSwimming),
+            // Cycling metrics (iOS 17+)
+            HKQuantityType(.cyclingPower),
+            HKQuantityType(.cyclingCadence),
+            HKQuantityType(.cyclingSpeed),
+            // Running metrics (iOS 16+)
+            HKQuantityType(.runningPower),
+            HKQuantityType(.runningSpeed)
         ]
 
         let writeTypes: Set<HKSampleType> = [
@@ -142,6 +150,44 @@ private extension HKWorkout {
         let distance = distanceType.flatMap { statistics(for: $0)?.sumQuantity() }
             .map { $0.doubleValue(for: .meter()) }
 
+        // Cycling-specific metrics (iOS 17+); nil if not a cycling workout or not recorded
+        let isCycling = workoutActivityType == .cycling
+        let avgPower: Double?
+        let maxPower: Double?
+        let avgCadence: Double?
+        let avgSpeed: Double?
+        let maxSpeed: Double?
+
+        if isCycling {
+            avgPower  = statistics(for: HKQuantityType(.cyclingPower))?
+                .averageQuantity()?.doubleValue(for: .watt())
+            maxPower  = statistics(for: HKQuantityType(.cyclingPower))?
+                .maximumQuantity()?.doubleValue(for: .watt())
+            avgCadence = statistics(for: HKQuantityType(.cyclingCadence))?
+                .averageQuantity()?.doubleValue(for: HKUnit(from: "count/min"))
+            avgSpeed  = statistics(for: HKQuantityType(.cyclingSpeed))?
+                .averageQuantity()?.doubleValue(for: .meter().unitDivided(by: .second()))
+            maxSpeed  = statistics(for: HKQuantityType(.cyclingSpeed))?
+                .maximumQuantity()?.doubleValue(for: .meter().unitDivided(by: .second()))
+        } else if workoutActivityType == .running {
+            // Running power (iOS 16+)
+            avgPower  = statistics(for: HKQuantityType(.runningPower))?
+                .averageQuantity()?.doubleValue(for: .watt())
+            maxPower  = statistics(for: HKQuantityType(.runningPower))?
+                .maximumQuantity()?.doubleValue(for: .watt())
+            avgCadence = nil  // No direct runningCadence identifier in HealthKit
+            avgSpeed  = statistics(for: HKQuantityType(.runningSpeed))?
+                .averageQuantity()?.doubleValue(for: .meter().unitDivided(by: .second()))
+            maxSpeed  = statistics(for: HKQuantityType(.runningSpeed))?
+                .maximumQuantity()?.doubleValue(for: .meter().unitDivided(by: .second()))
+        } else {
+            avgPower  = nil
+            maxPower  = nil
+            avgCadence = nil
+            avgSpeed  = nil
+            maxSpeed  = nil
+        }
+
         return NormalizedWorkout(
             externalID: uuid.uuidString,
             source: .healthKit,
@@ -153,7 +199,12 @@ private extension HKWorkout {
             distance: distance,
             calories: calories ?? nil,
             avgHeartRate: avgHR ?? nil,
-            maxHeartRate: maxHR ?? nil
+            maxHeartRate: maxHR ?? nil,
+            avgPower: avgPower,
+            maxPower: maxPower,
+            avgCadence: avgCadence,
+            avgSpeed: avgSpeed,
+            maxSpeed: maxSpeed
         )
     }
 }

@@ -91,8 +91,27 @@ struct WorkoutDetailView: View {
         if let power = workout.avgPower {
             LabeledContent("Avg Power", value: String(format: "%.0f W", power))
         }
+        if let power = workout.maxPower {
+            LabeledContent("Max Power", value: String(format: "%.0f W", power))
+        }
+        if let np = workout.normalizedPower {
+            LabeledContent("Normalized Power", value: String(format: "%.0f W", np))
+        }
         if let cadence = workout.avgCadence {
             LabeledContent("Avg Cadence", value: String(format: "%.0f rpm", cadence))
+        }
+        if let speed = workout.avgSpeed {
+            let isCycling = [SportType.ride, .virtualRide, .mountainBike].contains(workout.sportType)
+            let label = isCycling ? "Avg Speed" : "Avg Pace"
+            let value = isCycling
+                ? String(format: "%.1f km/h", speed * 3.6)
+                : formattedPace(speed)
+            LabeledContent(label, value: value)
+        }
+        if let speed = workout.maxSpeed {
+            let isCycling = [SportType.ride, .virtualRide, .mountainBike].contains(workout.sportType)
+            LabeledContent(isCycling ? "Max Speed" : "Max Pace",
+                           value: isCycling ? String(format: "%.1f km/h", speed * 3.6) : formattedPace(speed))
         }
         if let elevation = workout.elevationGain {
             LabeledContent("Elevation Gain", value: String(format: "%.0f m", elevation))
@@ -103,7 +122,9 @@ struct WorkoutDetailView: View {
         workout.distance != nil ||
         workout.calories != nil ||
         workout.avgHeartRate != nil ||
-        workout.avgPower != nil
+        workout.avgPower != nil ||
+        workout.maxPower != nil ||
+        workout.normalizedPower != nil
     }
 
     private func formattedDuration(_ seconds: TimeInterval) -> String {
@@ -112,5 +133,14 @@ struct WorkoutDetailView: View {
         let s = Int(seconds) % 60
         if h > 0 { return String(format: "%d:%02d:%02d", h, m, s) }
         return String(format: "%d:%02d", m, s)
+    }
+
+    /// Formats m/s as min/km pace string, e.g. "4:32 /km"
+    private func formattedPace(_ metersPerSecond: Double) -> String {
+        guard metersPerSecond > 0 else { return "—" }
+        let secondsPerKm = 1000.0 / metersPerSecond
+        let mins = Int(secondsPerKm) / 60
+        let secs = Int(secondsPerKm) % 60
+        return String(format: "%d:%02d /km", mins, secs)
     }
 }

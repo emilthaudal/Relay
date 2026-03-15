@@ -24,8 +24,11 @@ struct NormalizedWorkout: Identifiable {
     var avgHeartRate: Double?       // bpm
     var maxHeartRate: Double?
     var avgPower: Double?           // watts
+    var maxPower: Double?           // watts
+    var normalizedPower: Double?    // watts (NP / weighted average power)
     var avgCadence: Double?         // rpm / spm
     var avgSpeed: Double?           // m/s
+    var maxSpeed: Double?           // m/s
     var elevationGain: Double?      // meters
 
     init(
@@ -42,8 +45,11 @@ struct NormalizedWorkout: Identifiable {
         avgHeartRate: Double? = nil,
         maxHeartRate: Double? = nil,
         avgPower: Double? = nil,
+        maxPower: Double? = nil,
+        normalizedPower: Double? = nil,
         avgCadence: Double? = nil,
         avgSpeed: Double? = nil,
+        maxSpeed: Double? = nil,
         elevationGain: Double? = nil
     ) {
         self.id = id
@@ -59,8 +65,11 @@ struct NormalizedWorkout: Identifiable {
         self.avgHeartRate = avgHeartRate
         self.maxHeartRate = maxHeartRate
         self.avgPower = avgPower
+        self.maxPower = maxPower
+        self.normalizedPower = normalizedPower
         self.avgCadence = avgCadence
         self.avgSpeed = avgSpeed
+        self.maxSpeed = maxSpeed
         self.elevationGain = elevationGain
     }
 }

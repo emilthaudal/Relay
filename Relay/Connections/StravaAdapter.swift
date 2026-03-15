@@ -199,8 +199,11 @@ private struct StravaActivity: Decodable {
     let average_heartrate: Double?
     let max_heartrate: Double?
     let average_watts: Double?
+    let max_watts: Double?
+    let weighted_average_watts: Double?   // Normalized Power
     let average_cadence: Double?
     let average_speed: Double?
+    let max_speed: Double?
     let trainer: Bool?
     let kilojoules: Double?
 
@@ -222,8 +225,11 @@ private struct StravaActivity: Decodable {
             avgHeartRate: average_heartrate,
             maxHeartRate: max_heartrate,
             avgPower: average_watts,
+            maxPower: max_watts,
+            normalizedPower: weighted_average_watts,
             avgCadence: average_cadence,
             avgSpeed: average_speed,
+            maxSpeed: max_speed,
             elevationGain: total_elevation_gain
         )
     }

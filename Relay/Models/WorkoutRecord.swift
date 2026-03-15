@@ -28,8 +28,11 @@ final class WorkoutRecord {
     var avgHeartRate: Double?           // bpm
     var maxHeartRate: Double?
     var avgPower: Double?               // watts
+    var maxPower: Double?               // watts
+    var normalizedPower: Double?        // watts (NP / weighted average power)
     var avgCadence: Double?             // rpm / spm
     var avgSpeed: Double?               // m/s
+    var maxSpeed: Double?               // m/s
     var elevationGain: Double?          // meters
 
     // MARK: - Sync records
