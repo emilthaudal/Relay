@@ -8,14 +8,16 @@
 //
 
 import Foundation
+import Observation
 import SwiftData
 
+@Observable
 @MainActor
-final class SyncEngine: ObservableObject {
+final class SyncEngine {
 
-    @Published private(set) var isSyncing = false
-    @Published private(set) var lastSyncDate: Date?
-    @Published private(set) var lastError: Error?
+    private(set) var isSyncing = false
+    private(set) var lastSyncDate: Date?
+    private(set) var lastError: Error?
 
     // MARK: - Adapters
 

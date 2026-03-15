@@ -44,7 +44,7 @@ private struct SettingsConnectionRow: View {
         HStack(spacing: 12) {
             Image(systemName: connection.symbolName)
                 .font(.title3)
-                .foregroundStyle(isEnabled ? .tint : .secondary)
+                .foregroundStyle(isEnabled ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                 .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 2) {

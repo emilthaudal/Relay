@@ -10,7 +10,7 @@ import SwiftData
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
-    @StateObject private var engine = SyncEngine()
+    @State private var engine = SyncEngine()
     @State private var isSyncing = false
 
     var body: some View {

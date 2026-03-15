@@ -280,7 +280,8 @@
 				DEVELOPMENT_TEAM = BQSWK4U73N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Relay/Info.plist;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Relay reads your workouts from Apple Health to sync them across your connected fitness platforms.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Relay writes workouts to Apple Health from your connected fitness platforms.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -314,7 +315,8 @@
 				DEVELOPMENT_TEAM = BQSWK4U73N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = Relay/Info.plist;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Relay reads your workouts from Apple Health to sync them across your connected fitness platforms.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Relay writes workouts to Apple Health from your connected fitness platforms.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

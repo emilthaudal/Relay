@@ -14,7 +14,7 @@ struct WorkoutListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \WorkoutRecord.startDate, order: .reverse) private var workouts: [WorkoutRecord]
 
-    @StateObject private var engine = SyncEngine()
+    @State private var engine = SyncEngine()
     @State private var showingWorkout: WorkoutRecord?
 
     var body: some View {

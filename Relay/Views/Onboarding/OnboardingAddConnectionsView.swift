@@ -59,7 +59,7 @@ struct OnboardingAddConnectionsView: View {
                 Divider().padding(.leading, 56)
             }
         }
-        .background(.secondarySystemGroupedBackground, in: RoundedRectangle(cornerRadius: 12))
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal)
     }
 }
@@ -81,7 +81,7 @@ private struct ConnectionRow: View {
         HStack(spacing: 12) {
             Image(systemName: connection.symbolName)
                 .font(.title2)
-                .foregroundStyle(isEnabled ? .tint : .secondary)
+                .foregroundStyle(isEnabled ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
                 .frame(width: 32)
 
             VStack(alignment: .leading, spacing: 2) {

@@ -119,7 +119,10 @@ actor HealthKitAdapter: ConnectionAdapter {
         _ = totalEnergy
         _ = totalDistance
 
-        return hkWorkout.uuid.uuidString
+        guard let workout = hkWorkout else {
+            throw AdapterError.uploadFailed("finishWorkout returned nil")
+        }
+        return workout.uuid.uuidString
     }
 }
 
