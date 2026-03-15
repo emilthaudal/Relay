@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "Relay",
+  "project_id": "9010a6f7-d6bb-483c-bd07-a0eb12f4571a"
+}
