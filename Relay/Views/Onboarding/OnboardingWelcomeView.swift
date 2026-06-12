@@ -6,11 +6,9 @@
 //
 
 import SwiftUI
-import SwiftData
 
 struct OnboardingWelcomeView: View {
     @Environment(AppState.self) private var appState
-    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         NavigationStack {
@@ -50,16 +48,6 @@ struct OnboardingWelcomeView: View {
                 .padding(.bottom)
             }
             .navigationBarHidden(true)
-        }
-        .onAppear { ensureAppState() }
-    }
-
-    /// Insert an AppState if none exists yet (first launch).
-    private func ensureAppState() {
-        let descriptor = FetchDescriptor<AppState>()
-        let count = (try? modelContext.fetchCount(descriptor)) ?? 0
-        if count == 0 {
-            modelContext.insert(AppState())
         }
     }
 }

@@ -3,7 +3,7 @@
 //  Relay
 //
 //  OAuth2 adapter for Strava. Uses ASWebAuthenticationSession for the auth flow.
-//  Tokens stored in UserDefaults (placeholder — migrate to Keychain before shipping).
+//  Tokens stored in Keychain. Client credentials read from Info.plist (wired via Secrets.xcconfig).
 //  Polling only (no webhook backend). Rate limit: 200/15min, 2000/day.
 //
 
@@ -11,10 +11,6 @@ import Foundation
 #if os(iOS)
 import AuthenticationServices
 #endif
-
-// MARK: - Placeholder credentials (register at https://www.strava.com/settings/api)
-private let STRAVA_CLIENT_ID_PLACEHOLDER     = "STRAVA_CLIENT_ID_PLACEHOLDER"
-private let STRAVA_CLIENT_SECRET_PLACEHOLDER = "STRAVA_CLIENT_SECRET_PLACEHOLDER"
 
 private let kStravaAccessToken  = "relay.strava.accessToken"
 private let kStravaRefreshToken = "relay.strava.refreshToken"
@@ -25,20 +21,42 @@ actor StravaAdapter: ConnectionAdapter {
     let connectionType: ConnectionType = .strava
 
     private let baseURL = URL(string: "https://www.strava.com/api/v3")!
+
+    // Read from Info.plist, which is populated at build time from Secrets.xcconfig
+    private var clientID: String {
+        Bundle.main.infoDictionary?["StravaClientID"] as? String ?? "STRAVA_CLIENT_ID_PLACEHOLDER"
+    }
+    private var clientSecret: String {
+        Bundle.main.infoDictionary?["StravaClientSecret"] as? String ?? "STRAVA_CLIENT_SECRET_PLACEHOLDER"
+    }
+
     private var accessToken: String? {
-        get { UserDefaults.standard.string(forKey: kStravaAccessToken) }
-        set { UserDefaults.standard.set(newValue, forKey: kStravaAccessToken) }
+        get { KeychainHelper.get(forKey: kStravaAccessToken) }
+        set {
+            if let v = newValue { KeychainHelper.set(v, forKey: kStravaAccessToken) }
+            else { KeychainHelper.delete(forKey: kStravaAccessToken) }
+        }
     }
     private var refreshToken: String? {
-        get { UserDefaults.standard.string(forKey: kStravaRefreshToken) }
-        set { UserDefaults.standard.set(newValue, forKey: kStravaRefreshToken) }
+        get { KeychainHelper.get(forKey: kStravaRefreshToken) }
+        set {
+            if let v = newValue { KeychainHelper.set(v, forKey: kStravaRefreshToken) }
+            else { KeychainHelper.delete(forKey: kStravaRefreshToken) }
+        }
     }
     private var tokenExpiry: Date? {
         get {
-            let ts = UserDefaults.standard.double(forKey: kStravaTokenExpiry)
-            return ts > 0 ? Date(timeIntervalSince1970: ts) : nil
+            guard let s = KeychainHelper.get(forKey: kStravaTokenExpiry),
+                  let ts = Double(s), ts > 0 else { return nil }
+            return Date(timeIntervalSince1970: ts)
         }
-        set { UserDefaults.standard.set(newValue?.timeIntervalSince1970 ?? 0, forKey: kStravaTokenExpiry) }
+        set {
+            if let v = newValue {
+                KeychainHelper.set("\(v.timeIntervalSince1970)", forKey: kStravaTokenExpiry)
+            } else {
+                KeychainHelper.delete(forKey: kStravaTokenExpiry)
+            }
+        }
     }
 
     // MARK: - Auth state
@@ -57,9 +75,9 @@ actor StravaAdapter: ConnectionAdapter {
     }
 
     func disconnect() async {
-        UserDefaults.standard.removeObject(forKey: kStravaAccessToken)
-        UserDefaults.standard.removeObject(forKey: kStravaRefreshToken)
-        UserDefaults.standard.removeObject(forKey: kStravaTokenExpiry)
+        KeychainHelper.delete(forKey: kStravaAccessToken)
+        KeychainHelper.delete(forKey: kStravaRefreshToken)
+        KeychainHelper.delete(forKey: kStravaTokenExpiry)
     }
 
     // MARK: - Fetch
@@ -88,8 +106,40 @@ actor StravaAdapter: ConnectionAdapter {
     // MARK: - Upload (stub — full GPX/FIT upload is complex; returns placeholder)
 
     func upload(_ workout: NormalizedWorkout) async throws -> String {
-        // TODO: Implement multipart GPX upload via POST /uploads
         throw AdapterError.uploadFailed("Strava upload not yet implemented")
+    }
+
+    // MARK: - Activity streams (per-second time-series)
+
+    func fetchStreams(activityID: String, startDate: Date) async throws -> ActivityStreams {
+        try await refreshIfNeeded()
+        guard let token = accessToken else { throw AdapterError.authFailed("Not authenticated") }
+
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("activities/\(activityID)/streams"),
+            resolvingAgainstBaseURL: false
+        )!
+        components.queryItems = [
+            URLQueryItem(name: "keys", value: "time,heartrate,watts,cadence,velocity_smooth,altitude"),
+            URLQueryItem(name: "key_by_type", value: "false"),
+        ]
+
+        var request = URLRequest(url: components.url!)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validateResponse(response)
+
+        let streamSet = try JSONDecoder().decode([StravaStream].self, from: data)
+        return ActivityStreams(
+            startDate: startDate,
+            time:      streamSet.first(where: { $0.type == "time" })?.data.map { Int($0) } ?? [],
+            heartRate: streamSet.first(where: { $0.type == "heartrate" })?.data.map { Int($0) },
+            watts:     streamSet.first(where: { $0.type == "watts" })?.data.map { Int($0) },
+            cadence:   streamSet.first(where: { $0.type == "cadence" })?.data.map { Int($0) },
+            velocity:  streamSet.first(where: { $0.type == "velocity_smooth" })?.data,
+            altitude:  streamSet.first(where: { $0.type == "altitude" })?.data
+        )
     }
 
     // MARK: - OAuth helpers
@@ -99,11 +149,11 @@ actor StravaAdapter: ConnectionAdapter {
         let redirectURI = "relay://strava-callback"
         var components = URLComponents(string: "https://www.strava.com/oauth/mobile/authorize")!
         components.queryItems = [
-            URLQueryItem(name: "client_id",     value: STRAVA_CLIENT_ID_PLACEHOLDER),
-            URLQueryItem(name: "redirect_uri",  value: redirectURI),
-            URLQueryItem(name: "response_type", value: "code"),
+            URLQueryItem(name: "client_id",       value: clientID),
+            URLQueryItem(name: "redirect_uri",    value: redirectURI),
+            URLQueryItem(name: "response_type",   value: "code"),
             URLQueryItem(name: "approval_prompt", value: "auto"),
-            URLQueryItem(name: "scope",         value: "activity:read_all,activity:write")
+            URLQueryItem(name: "scope",           value: "activity:read_all,activity:write")
         ]
 
         return try await withCheckedThrowingContinuation { continuation in
@@ -133,8 +183,8 @@ actor StravaAdapter: ConnectionAdapter {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: String] = [
-            "client_id":     STRAVA_CLIENT_ID_PLACEHOLDER,
-            "client_secret": STRAVA_CLIENT_SECRET_PLACEHOLDER,
+            "client_id":     clientID,
+            "client_secret": clientSecret,
             "code":          code,
             "grant_type":    "authorization_code"
         ]
@@ -157,8 +207,8 @@ actor StravaAdapter: ConnectionAdapter {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         let body: [String: String] = [
-            "client_id":     STRAVA_CLIENT_ID_PLACEHOLDER,
-            "client_secret": STRAVA_CLIENT_SECRET_PLACEHOLDER,
+            "client_id":     clientID,
+            "client_secret": clientSecret,
             "refresh_token": refresh,
             "grant_type":    "refresh_token"
         ]
@@ -181,6 +231,11 @@ actor StravaAdapter: ConnectionAdapter {
 }
 
 // MARK: - Strava API models
+
+private struct StravaStream: Decodable {
+    let type: String
+    let data: [Double]
+}
 
 private struct StravaTokenResponse: Decodable {
     let access_token: String

@@ -3,8 +3,9 @@
 //  Relay
 //
 //  Central orchestrator: fetches workouts from all enabled adapters, clusters/merges them,
-//  persists WorkoutRecords + SyncRecords to SwiftData, then uploads to any connections
-//  that are missing the workout.
+//  persists WorkoutRecords + SyncRecords to SwiftData, then uploads to HealthKit.
+//  Streams (per-second time-series) are fetched from Strava/Intervals.icu and written to
+//  HealthKit when available; falls back to aggregate stats if streams are unavailable.
 //
 
 import Foundation
@@ -25,25 +26,16 @@ final class SyncEngine {
     private let strava     = StravaAdapter()
     private let intervals  = IntervalsAdapter()
 
-    private func adapter(for type: ConnectionType) -> (any ConnectionAdapter)? {
-        switch type {
-        case .healthKit:  return healthKit
-        case .strava:     return strava
-        case .intervals:  return intervals
-        case .hammerhead: return nil
-        }
-    }
-
     // MARK: - Public API
 
-    func sync(appState: AppState) async {
+    func sync(appState: AppState, context: ModelContext) async {
         guard !isSyncing else { return }
         isSyncing = true
         lastError = nil
         defer { isSyncing = false }
 
         do {
-            try await performSync(appState: appState)
+            try await performSync(appState: appState, context: context)
             lastSyncDate = Date()
         } catch {
             lastError = error
@@ -52,31 +44,107 @@ final class SyncEngine {
 
     // MARK: - Core logic
 
-    private func performSync(appState: AppState) async throws {
-        let since = lastSyncDate ?? Date().addingTimeInterval(-30 * 24 * 3600) // default: 30 days back
+    private func performSync(appState: AppState, context: ModelContext) async throws {
+        let since = lastSyncDate ?? Date().addingTimeInterval(-30 * 24 * 3600)
 
         // 1. Fetch from all enabled adapters
         var allWorkouts: [NormalizedWorkout] = []
         for connection in appState.enabledConnections {
-            guard let adapter = adapter(for: connection) else { continue }
+            let adapter: (any ConnectionAdapter)? = switch connection {
+            case .healthKit:  healthKit
+            case .strava:     strava
+            case .intervals:  intervals
+            case .hammerhead: nil
+            }
+            guard let adapter else { continue }
             do {
                 let fetched = try await adapter.fetchWorkouts(since: since)
                 allWorkouts.append(contentsOf: fetched)
             } catch {
-                // Log but continue — partial fetch is better than full failure
                 print("[SyncEngine] fetch failed for \(connection.displayName): \(error)")
             }
         }
 
-        // 2. Cluster into matched groups
+        // 2. Cluster into matched groups and persist
         let clusters = WorkoutMatcher.cluster(allWorkouts)
+        for cluster in clusters {
+            upsert(cluster: cluster, appState: appState, into: context)
+        }
+        try context.save()
 
-        // 3. For each cluster, determine primary source + merge
-        // (Caller passes a ModelContext via environment — we'll receive it via the view layer.
-        //  SyncEngine itself is model-context-agnostic for testability.)
+        // 3. Upload to HealthKit for any workout that's still pending there
+        guard appState.enabledConnections.contains(.healthKit) else { return }
+
+        let allRecords = (try? context.fetch(FetchDescriptor<WorkoutRecord>())) ?? []
+        let pendingForHK = allRecords.filter { record in
+            record.syncRecords.contains { $0.connection == .healthKit && $0.state == .pending }
+        }
+
+        for record in pendingForHK {
+            await uploadToHealthKit(record: record)
+        }
+        try? context.save()
     }
 
-    // MARK: - Persistence helpers (called from views that have modelContext)
+    // MARK: - HealthKit upload
+
+    private func uploadToHealthKit(record: WorkoutRecord) async {
+        let workout = record.toNormalized()
+        guard let hkSync = record.syncRecords.first(where: { $0.connection == .healthKit }) else { return }
+
+        hkSync.state = .uploading
+
+        do {
+            let hkID: String
+
+            // Prefer time-series streams from the primary source
+            if let sourceSync = record.syncRecords.first(where: { $0.isPrimarySource && $0.connection != .healthKit }),
+               let streams = await fetchStreams(connection: sourceSync.connection,
+                                               activityID: sourceSync.externalID,
+                                               startDate: workout.startDate) {
+                print("[SyncEngine] Uploading \"\(record.name)\" to HealthKit with \(streams.time.count) stream samples")
+                hkID = try await healthKit.uploadWithStreams(workout, streams: streams)
+            } else {
+                print("[SyncEngine] Uploading \"\(record.name)\" to HealthKit with aggregate stats (streams unavailable)")
+                hkID = try await healthKit.upload(workout)
+            }
+
+            hkSync.externalID = hkID
+            hkSync.markSynced()
+        } catch {
+            hkSync.markFailed(error: error)
+            print("[SyncEngine] HealthKit upload failed for \"\(record.name)\": \(error)")
+        }
+    }
+
+    private func fetchStreams(connection: ConnectionType,
+                              activityID: String,
+                              startDate: Date) async -> ActivityStreams? {
+        switch connection {
+        case .strava:
+            do {
+                let s = try await strava.fetchStreams(activityID: activityID, startDate: startDate)
+                print("[SyncEngine] Strava streams OK: \(s.time.count) samples")
+                return s
+            } catch {
+                print("[SyncEngine] Strava streams failed: \(error)")
+                return nil
+            }
+        case .intervals:
+            do {
+                let s = try await intervals.fetchStreams(activityID: activityID, startDate: startDate)
+                print("[SyncEngine] Intervals.icu streams OK: \(s.time.count) samples")
+                return s
+            } catch {
+                print("[SyncEngine] Intervals.icu streams failed: \(error)")
+                return nil
+            }
+        default:
+            return nil
+        }
+    }
+
+    // MARK: - Persistence
 
     func upsert(cluster: [NormalizedWorkout],
                 appState: AppState,
@@ -87,10 +155,13 @@ final class SyncEngine {
         )
         let merged = WorkoutMerger.merge(cluster, orderedSources: orderedSources)
 
-        // Check for existing record
-        let descriptor = FetchDescriptor<WorkoutRecord>()
-        let existing = (try? context.fetch(descriptor)) ?? []
-        let record = existing.first(where: { $0.id == merged.id }) ?? {
+        // Look up by matching any external ID in the cluster (stable across fetches)
+        let existing = (try? context.fetch(FetchDescriptor<WorkoutRecord>())) ?? []
+        let record = existing.first(where: { existingRecord in
+            existingRecord.syncRecords.contains { sr in
+                cluster.contains { w in w.source == sr.connection && w.externalID == sr.externalID }
+            }
+        }) ?? {
             let r = WorkoutRecord(
                 id: merged.id,
                 startDate: merged.startDate,
@@ -99,25 +170,26 @@ final class SyncEngine {
                 name: merged.name,
                 isTrainer: merged.isTrainer
             )
-            r.distance = merged.distance
-            r.calories = merged.calories
-            r.avgHeartRate = merged.avgHeartRate
-            r.maxHeartRate = merged.maxHeartRate
-            r.avgPower = merged.avgPower
-            r.maxPower = merged.maxPower
-            r.normalizedPower = merged.normalizedPower
-            r.avgCadence = merged.avgCadence
-            r.avgSpeed = merged.avgSpeed
-            r.maxSpeed = merged.maxSpeed
-            r.elevationGain = merged.elevationGain
             context.insert(r)
             return r
         }()
 
+        // Update all metrics (higher-priority source may have richer data now)
+        record.distance        = merged.distance
+        record.calories        = merged.calories
+        record.avgHeartRate    = merged.avgHeartRate
+        record.maxHeartRate    = merged.maxHeartRate
+        record.avgPower        = merged.avgPower
+        record.maxPower        = merged.maxPower
+        record.normalizedPower = merged.normalizedPower
+        record.avgCadence      = merged.avgCadence
+        record.avgSpeed        = merged.avgSpeed
+        record.maxSpeed        = merged.maxSpeed
+        record.elevationGain   = merged.elevationGain
+
         // Upsert SyncRecords for each source in the cluster
         for workout in cluster {
-            let existingSync = record.syncRecords.first { $0.connection == workout.source }
-            if existingSync == nil {
+            if !record.syncRecords.contains(where: { $0.connection == workout.source }) {
                 let isPrimary = workout.source == orderedSources.first
                 let syncRecord = SyncRecord(
                     connection: workout.source,
@@ -130,19 +202,17 @@ final class SyncEngine {
             }
         }
 
-        // Create pending SyncRecords for connections that don't have the workout yet
-        for connection in appState.enabledConnections {
-            let alreadyHas = record.syncRecords.contains { $0.connection == connection }
-            if !alreadyHas {
-                let syncRecord = SyncRecord(
-                    connection: connection,
-                    externalID: "",
-                    state: .pending,
-                    isPrimarySource: false
-                )
-                syncRecord.workout = record
-                context.insert(syncRecord)
-            }
+        // Create a pending SyncRecord for HealthKit if not present
+        if appState.enabledConnections.contains(.healthKit),
+           !record.syncRecords.contains(where: { $0.connection == .healthKit }) {
+            let syncRecord = SyncRecord(
+                connection: .healthKit,
+                externalID: "",
+                state: .pending,
+                isPrimarySource: false
+            )
+            syncRecord.workout = record
+            context.insert(syncRecord)
         }
     }
 }

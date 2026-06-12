@@ -30,7 +30,7 @@ struct WorkoutListView: View {
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {
-                        Task { await engine.sync(appState: appState) }
+                        Task { await engine.sync(appState: appState, context: modelContext) }
                     } label: {
                         if engine.isSyncing {
                             ProgressView().controlSize(.small)

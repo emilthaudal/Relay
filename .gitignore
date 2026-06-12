@@ -52,6 +52,7 @@ fastlane/screenshots/**/*.png
 fastlane/test_output
 
 # Secrets / environment files
+Relay/Secrets.xcconfig
 .env
 .env.*
 *.pem
@@ -86,3 +87,6 @@ TestResults/
 # Beads / Dolt files (added by bd init)
 .beads-credential-key
 .beads/proxieddb/
+
+# Ephemeral exports
+issue-export.jsonl

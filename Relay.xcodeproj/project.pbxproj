@@ -27,6 +27,7 @@
 		490F37382F66C7D000859698 /* Relay.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Relay.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		490F37492F66C7D100859698 /* RelayTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RelayTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		490F37532F66C7D100859698 /* RelayUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RelayUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		ABCDEF102F66C7D100859698 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Secrets.xcconfig; path = Relay/Secrets.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -79,6 +80,7 @@
 				490F374C2F66C7D100859698 /* RelayTests */,
 				490F37562F66C7D100859698 /* RelayUITests */,
 				490F37392F66C7D000859698 /* Products */,
+				ABCDEF102F66C7D100859698 /* Secrets.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
@@ -271,6 +273,7 @@
 /* Begin XCBuildConfiguration section */
 		490F375D2F66C7D100859698 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = ABCDEF102F66C7D100859698 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -282,6 +285,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Relay reads your workouts from Apple Health to sync them across your connected fitness platforms.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Relay writes workouts to Apple Health from your connected fitness platforms.";
+				INFOPLIST_KEY_StravaClientID = "$(STRAVA_CLIENT_ID)";
+				INFOPLIST_KEY_StravaClientSecret = "$(STRAVA_CLIENT_SECRET)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -306,6 +311,7 @@
 		};
 		490F375E2F66C7D100859698 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = ABCDEF102F66C7D100859698 /* Secrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -317,6 +323,8 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHealthShareUsageDescription = "Relay reads your workouts from Apple Health to sync them across your connected fitness platforms.";
 				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Relay writes workouts to Apple Health from your connected fitness platforms.";
+				INFOPLIST_KEY_StravaClientID = "$(STRAVA_CLIENT_ID)";
+				INFOPLIST_KEY_StravaClientSecret = "$(STRAVA_CLIENT_SECRET)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

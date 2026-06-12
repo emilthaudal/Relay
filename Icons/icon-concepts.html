@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relay — Icon Concepts</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: #f5f4f2;
+    min-height: 100vh;
+    padding: 48px 32px;
+    color: #1a1a1a;
+  }
+
+  h1 {
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 48px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 40px;
+  }
+
+  .concept {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .icon-wrap {
+    width: 180px;
+    height: 180px;
+    border-radius: 40px;
+    overflow: hidden;
+    box-shadow:
+      0 1px 2px rgba(0,0,0,0.04),
+      0 4px 16px rgba(0,0,0,0.08),
+      0 12px 40px rgba(0,0,0,0.06);
+  }
+
+  .icon-wrap svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .label {
+    font-size: 12px;
+    font-weight: 400;
+    color: #999;
+    letter-spacing: 0.04em;
+  }
+</style>
+</head>
+<body>
+
+<h1>Relay — Icon Concepts</h1>
+
+<div class="grid">
+
+  <!-- A: Lightning bolt, clean & minimal -->
+  <div class="concept">
+    <div class="icon-wrap">
+      <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bg-a" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#faf9f7"/>
+            <stop offset="100%" stop-color="#f0eef8"/>
+          </linearGradient>
+          <linearGradient id="bolt-a" x1="0.3" y1="0" x2="0.7" y2="1">
+            <stop offset="0%" stop-color="#9b75e8"/>
+            <stop offset="100%" stop-color="#7c5cbf"/>
+          </linearGradient>
+        </defs>
+        <rect width="1024" height="1024" fill="url(#bg-a)"/>
+        <!-- Lightning bolt, centered, generous padding -->
+        <path d="M580 130 L310 545 L470 545 L440 894 L720 460 L555 460 Z"
+              fill="url(#bolt-a)"
+              stroke="none"/>
+      </svg>
+    </div>
+    <span class="label">A — Lightning, solid</span>
+  </div>
+
+  <!-- B: Lightning bolt, outlined / stroked -->
+  <div class="concept">
+    <div class="icon-wrap">
+      <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bg-b" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#fdfcff"/>
+            <stop offset="100%" stop-color="#ede9f9"/>
+          </linearGradient>
+        </defs>
+        <rect width="1024" height="1024" fill="url(#bg-b)"/>
+        <path d="M580 130 L310 545 L470 545 L440 894 L720 460 L555 460 Z"
+              fill="none"
+              stroke="#8b6bd4"
+              stroke-width="48"
+              stroke-linejoin="round"
+              stroke-linecap="round"/>
+      </svg>
+    </div>
+    <span class="label">B — Lightning, outlined</span>
+  </div>
+
+  <!-- C: Two circular arrows (sync) -->
+  <div class="concept">
+    <div class="icon-wrap">
+      <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bg-c" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#faf9ff"/>
+            <stop offset="100%" stop-color="#ede8f8"/>
+          </linearGradient>
+          <linearGradient id="arc-c" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#a584e8"/>
+            <stop offset="100%" stop-color="#7b58c8"/>
+          </linearGradient>
+        </defs>
+        <rect width="1024" height="1024" fill="url(#bg-c)"/>
+        <!-- Top arc arrow -->
+        <path d="M 280 460
+                 A 240 240 0 0 1 744 460"
+              fill="none"
+              stroke="url(#arc-c)"
+              stroke-width="72"
+              stroke-linecap="round"/>
+        <!-- Arrowhead top right -->
+        <polygon points="744,380 820,480 660,500" fill="#7b58c8"/>
+
+        <!-- Bottom arc arrow (reversed) -->
+        <path d="M 744 564
+                 A 240 240 0 0 1 280 564"
+              fill="none"
+              stroke="url(#arc-c)"
+              stroke-width="72"
+              stroke-linecap="round"/>
+        <!-- Arrowhead bottom left -->
+        <polygon points="280,644 204,544 364,524" fill="#a584e8"/>
+      </svg>
+    </div>
+    <span class="label">C — Sync arrows</span>
+  </div>
+
+  <!-- D: Relay baton / connected dots with motion lines -->
+  <div class="concept">
+    <div class="icon-wrap">
+      <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bg-d" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#fdfcff"/>
+            <stop offset="100%" stop-color="#ece7f8"/>
+          </linearGradient>
+          <linearGradient id="line-d" x1="0" y1="0.5" x2="1" y2="0.5">
+            <stop offset="0%" stop-color="#b89fec"/>
+            <stop offset="100%" stop-color="#7c5abf"/>
+          </linearGradient>
+        </defs>
+        <rect width="1024" height="1024" fill="url(#bg-d)"/>
+
+        <!-- Connecting line -->
+        <line x1="220" y1="512" x2="804" y2="512"
+              stroke="url(#line-d)" stroke-width="40" stroke-linecap="round"/>
+
+        <!-- Left node -->
+        <circle cx="220" cy="512" r="88" fill="#c2aef0"/>
+        <circle cx="220" cy="512" r="52" fill="white"/>
+
+        <!-- Right node (filled, receiving) -->
+        <circle cx="804" cy="512" r="88" fill="#7c5abf"/>
+        <circle cx="804" cy="512" r="52" fill="white"/>
+
+        <!-- Arrow on line -->
+        <polygon points="640,460 780,512 640,564" fill="#9370d8"/>
+
+        <!-- Motion lines left side -->
+        <line x1="120" y1="440" x2="175" y2="440" stroke="#c2aef0" stroke-width="20" stroke-linecap="round" opacity="0.5"/>
+        <line x1="100" y1="512" x2="165" y2="512" stroke="#c2aef0" stroke-width="20" stroke-linecap="round" opacity="0.35"/>
+        <line x1="120" y1="584" x2="175" y2="584" stroke="#c2aef0" stroke-width="20" stroke-linecap="round" opacity="0.5"/>
+      </svg>
+    </div>
+    <span class="label">D — Relay pass</span>
+  </div>
+
+  <!-- E: Lightning bolt, pill/badge style, offset -->
+  <div class="concept">
+    <div class="icon-wrap">
+      <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bg-e" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#f8f6ff"/>
+            <stop offset="100%" stop-color="#ede9fc"/>
+          </linearGradient>
+          <linearGradient id="pill-e" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#c4aff5"/>
+            <stop offset="100%" stop-color="#9b78e0"/>
+          </linearGradient>
+        </defs>
+        <rect width="1024" height="1024" fill="url(#bg-e)"/>
+        <!-- Soft pill shape behind bolt -->
+        <rect x="310" y="290" width="404" height="444" rx="202"
+              fill="url(#pill-e)" opacity="0.18"/>
+        <!-- Bolt -->
+        <path d="M565 195 L330 530 L475 530 L455 840 L700 480 L548 480 Z"
+              fill="#8b67d4"/>
+      </svg>
+    </div>
+    <span class="label">E — Lightning, halo</span>
+  </div>
+
+  <!-- F: Abstract pulse / activity wave -->
+  <div class="concept">
+    <div class="icon-wrap">
+      <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="bg-f" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#fdfbff"/>
+            <stop offset="100%" stop-color="#eee9fb"/>
+          </linearGradient>
+          <linearGradient id="wave-f" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#c3acf2" stop-opacity="0.4"/>
+            <stop offset="40%" stop-color="#9b75e4"/>
+            <stop offset="100%" stop-color="#7453c0" stop-opacity="0.4"/>
+          </linearGradient>
+        </defs>
+        <rect width="1024" height="1024" fill="url(#bg-f)"/>
+        <!-- Activity/pulse line -->
+        <polyline
+          points="130,512 260,512 320,310 390,720 455,400 520,620 570,512 700,512 755,310 810,512 894,512"
+          fill="none"
+          stroke="url(#wave-f)"
+          stroke-width="58"
+          stroke-linecap="round"
+          stroke-linejoin="round"/>
+      </svg>
+    </div>
+    <span class="label">F — Activity pulse</span>
+  </div>
+
+</div>
+
+</body>
+</html>

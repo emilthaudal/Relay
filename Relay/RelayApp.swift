@@ -37,6 +37,7 @@ struct RelayApp: App {
 // MARK: - Root routing view
 
 private struct RootView: View {
+    @Environment(\.modelContext) private var modelContext
     @Query private var appStates: [AppState]
 
     private var appState: AppState? { appStates.first }
@@ -52,7 +53,16 @@ private struct RootView: View {
             }
         } else {
             ProgressView("Loading…")
-                .onAppear { /* AppState is inserted lazily by first launch */ }
+                .onAppear { ensureAppState() }
+        }
+    }
+
+    /// Insert an AppState row on first launch so RootView can route correctly.
+    private func ensureAppState() {
+        let descriptor = FetchDescriptor<AppState>()
+        let count = (try? modelContext.fetchCount(descriptor)) ?? 0
+        if count == 0 {
+            modelContext.insert(AppState())
         }
     }
 }

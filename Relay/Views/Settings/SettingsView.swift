@@ -10,6 +10,7 @@ import SwiftData
 
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
+    @Environment(\.modelContext) private var modelContext
     @State private var engine = SyncEngine()
     @State private var isSyncing = false
 
@@ -38,7 +39,7 @@ struct SettingsView: View {
                     Button {
                         Task {
                             isSyncing = true
-                            await engine.sync(appState: appState)
+                            await engine.sync(appState: appState, context: modelContext)
                             isSyncing = false
                         }
                     } label: {
