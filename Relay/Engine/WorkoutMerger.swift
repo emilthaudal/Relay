@@ -61,6 +61,8 @@ struct WorkoutMerger {
             sportType: primary.sportType,
             name: primary.name,
             isTrainer: primary.isTrainer,
+            timeZone: primary.timeZone ?? sorted.lazy.compactMap(\.timeZone).first,
+            deviceName: primary.deviceName ?? sorted.lazy.compactMap(\.deviceName).first,
             distance: distance,
             calories: calories,
             avgHeartRate: avgHeartRate,

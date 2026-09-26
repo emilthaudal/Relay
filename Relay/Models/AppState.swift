@@ -17,6 +17,11 @@ final class AppState {
 
     var onboardingCompleted: Bool
 
+    // MARK: - Sync Options
+
+    /// When true, imported workouts are automatically uploaded to HealthKit after each sync.
+    var autoSyncToHealthKit: Bool
+
     // MARK: - Connections
 
     /// Raw values of enabled ConnectionTypes.
@@ -45,18 +50,10 @@ final class AppState {
 
     private func defaultPriority(for sport: SportType) -> [ConnectionType] {
         switch sport {
-        case .virtualRide:
-            return [.strava, .healthKit, .intervals]
-        case .ride, .mountainBike:
-            return [.strava, .healthKit, .intervals]
-        case .run, .trailRun, .virtualRun:
-            return [.healthKit, .strava, .intervals]
-        case .walk, .hike:
-            return [.healthKit, .strava]
-        case .swim, .openWaterSwim:
-            return [.healthKit, .strava, .intervals]
+        case .ride, .mountainBike, .virtualRide:
+            return [.intervals, .healthKit]
         default:
-            return [.healthKit, .strava]
+            return [.healthKit, .intervals]
         }
     }
 
@@ -64,6 +61,7 @@ final class AppState {
 
     init() {
         self.onboardingCompleted = false
+        self.autoSyncToHealthKit = true
         self.enabledConnectionsRaw = []
         self.sourcePriorityRaw = [:]
     }

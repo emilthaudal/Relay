@@ -6,7 +6,7 @@
 //  Adapters convert their native types to NormalizedWorkout before handing off to SyncEngine.
 //
 
-import Foundation
+@preconcurrency import Foundation
 
 struct NormalizedWorkout: Identifiable {
     let id: UUID
@@ -17,6 +17,8 @@ struct NormalizedWorkout: Identifiable {
     let sportType: SportType
     let name: String                // non-optional; adapters supply a fallback
     let isTrainer: Bool
+    var timeZone: TimeZone?
+    var deviceName: String?
 
     // Optional metrics
     var distance: Double?           // meters
@@ -31,7 +33,7 @@ struct NormalizedWorkout: Identifiable {
     var maxSpeed: Double?           // m/s
     var elevationGain: Double?      // meters
 
-    init(
+    nonisolated init(
         id: UUID = UUID(),
         externalID: String,
         source: ConnectionType,
@@ -40,6 +42,8 @@ struct NormalizedWorkout: Identifiable {
         sportType: SportType,
         name: String,
         isTrainer: Bool = false,
+        timeZone: TimeZone? = nil,
+        deviceName: String? = nil,
         distance: Double? = nil,
         calories: Int? = nil,
         avgHeartRate: Double? = nil,
@@ -60,6 +64,8 @@ struct NormalizedWorkout: Identifiable {
         self.sportType = sportType
         self.name = name
         self.isTrainer = isTrainer
+        self.timeZone = timeZone
+        self.deviceName = deviceName
         self.distance = distance
         self.calories = calories
         self.avgHeartRate = avgHeartRate

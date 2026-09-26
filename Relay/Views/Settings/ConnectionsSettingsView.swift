@@ -94,9 +94,6 @@ private struct SettingsConnectionRow: View {
                 case .healthKit:
                     let adapter = HealthKitAdapter()
                     try await adapter.authenticate()
-                case .strava:
-                    let adapter = StravaAdapter()
-                    try await adapter.authenticate()
                 case .intervals, .hammerhead:
                     break
                 }
@@ -116,12 +113,11 @@ private struct SettingsConnectionRow: View {
     private func disconnect() {
         Task {
             switch connection {
-            case .strava:    await StravaAdapter().disconnect()
             case .intervals: await IntervalsAdapter().disconnect()
             default: break
             }
             await MainActor.run {
-                appState.enabledConnections.remove(connection)
+                _ = appState.enabledConnections.remove(connection)
             }
         }
     }
@@ -129,7 +125,7 @@ private struct SettingsConnectionRow: View {
 
 // MARK: - Intervals.icu Credentials Sheet
 
-private struct IntervalsCredentialsView: View {
+struct IntervalsCredentialsView: View {
     @Environment(\.dismiss) private var dismiss
 
     let onConnected: () -> Void

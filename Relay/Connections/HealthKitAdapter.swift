@@ -6,8 +6,9 @@
 //  metric coverage. Supports both aggregate (avg/max stats) and time-series upload.
 //
 
+import CoreLocation
 import Foundation
-import HealthKit
+@preconcurrency import HealthKit
 
 actor HealthKitAdapter: ConnectionAdapter {
 
@@ -43,9 +44,9 @@ actor HealthKitAdapter: ConnectionAdapter {
             .runningSpeed,
         ]
         let readTypes: Set<HKObjectType> = Set(quantityTypes.map { HKQuantityType($0) as HKObjectType })
-            .union([HKObjectType.workoutType()])
+            .union([HKObjectType.workoutType(), HKSeriesType.workoutRoute()])
         let writeTypes: Set<HKSampleType> = Set(quantityTypes.map { HKQuantityType($0) as HKSampleType })
-            .union([HKObjectType.workoutType()])
+            .union([HKObjectType.workoutType(), HKSeriesType.workoutRoute()])
 
         try await store.requestAuthorization(toShare: writeTypes, read: readTypes)
     }
@@ -60,7 +61,7 @@ actor HealthKitAdapter: ConnectionAdapter {
         let predicate = HKQuery.predicateForSamples(withStart: date, end: nil, options: .strictStartDate)
         let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierStartDate, ascending: false)
 
-        return try await withCheckedThrowingContinuation { continuation in
+        let hkWorkouts: [HKWorkout] = try await withCheckedThrowingContinuation { continuation in
             let query = HKSampleQuery(
                 sampleType: HKObjectType.workoutType(),
                 predicate: predicate,
@@ -71,8 +72,74 @@ actor HealthKitAdapter: ConnectionAdapter {
                     continuation.resume(throwing: error)
                     return
                 }
-                let workouts = (samples as? [HKWorkout]) ?? []
-                continuation.resume(returning: workouts.map { $0.toNormalized() })
+                continuation.resume(returning: (samples as? [HKWorkout]) ?? [])
+            }
+            store.execute(query)
+        }
+
+        var workouts = hkWorkouts.map { $0.toNormalized() }
+        for i in workouts.indices {
+            if let gain = await elevationGain(for: hkWorkouts[i]) {
+                workouts[i].elevationGain = gain
+            }
+        }
+        return workouts
+    }
+
+    // MARK: - Elevation via GPS route
+
+    private func elevationGain(for workout: HKWorkout) async -> Double? {
+        let routes: [HKWorkoutRoute]
+        do {
+            routes = try await withCheckedThrowingContinuation { continuation in
+                let predicate = HKQuery.predicateForObjects(from: workout)
+                let query = HKSampleQuery(
+                    sampleType: HKSeriesType.workoutRoute(),
+                    predicate: predicate,
+                    limit: HKObjectQueryNoLimit,
+                    sortDescriptors: nil
+                ) { _, samples, error in
+                    if let error { continuation.resume(throwing: error) }
+                    else { continuation.resume(returning: (samples as? [HKWorkoutRoute]) ?? []) }
+                }
+                store.execute(query)
+            }
+        } catch {
+            return nil
+        }
+
+        guard !routes.isEmpty else { return nil }
+
+        var totalGain = 0.0
+        for route in routes {
+            guard let locations = try? await routeLocations(for: route), locations.count > 1 else { continue }
+            var prev = locations[0].altitude
+            for loc in locations.dropFirst() {
+                let delta = loc.altitude - prev
+                if delta > 0 { totalGain += delta }
+                prev = loc.altitude
+            }
+        }
+
+        return totalGain > 0 ? totalGain : nil
+    }
+
+    private func routeLocations(for route: HKWorkoutRoute) async throws -> [CLLocation] {
+        try await withCheckedThrowingContinuation { continuation in
+            var collected: [CLLocation] = []
+            var resumed = false
+            let query = HKWorkoutRouteQuery(route: route) { _, locations, done, error in
+                guard !resumed else { return }
+                if let error {
+                    resumed = true
+                    continuation.resume(throwing: error)
+                    return
+                }
+                if let locs = locations { collected.append(contentsOf: locs) }
+                if done {
+                    resumed = true
+                    continuation.resume(returning: collected)
+                }
             }
             store.execute(query)
         }
@@ -81,48 +148,62 @@ actor HealthKitAdapter: ConnectionAdapter {
     // MARK: - Upload (aggregate stats — single sample per metric spanning full workout)
 
     func upload(_ workout: NormalizedWorkout) async throws -> String {
-        let config = HKWorkoutConfiguration()
-        config.activityType = workout.sportType.hkActivityType
-
-        let builder = HKWorkoutBuilder(healthStore: store, configuration: config, device: .local())
-        let start = workout.startDate
-        let end = start.addingTimeInterval(workout.duration)
-
-        try await builder.beginCollection(at: start)
-
-        let samples = aggregateSamples(for: workout, start: start, end: end)
-        if !samples.isEmpty {
-            try await addSamples(samples, to: builder)
-        }
-        try await addMetadata(workoutMetadata(for: workout), to: builder)
-        try await builder.endCollection(at: end)
-        guard let finished = try await builder.finishWorkout() else {
-            throw AdapterError.uploadFailed("finishWorkout returned nil")
-        }
-        return finished.uuid.uuidString
+        let end = workout.startDate.addingTimeInterval(workout.duration)
+        let samples = aggregateSamples(for: workout, start: workout.startDate, end: end)
+        return try await save(workout, samples: samples, events: [], locations: [])
     }
 
     // MARK: - Upload with time-series streams
 
     func uploadWithStreams(_ workout: NormalizedWorkout, streams: ActivityStreams) async throws -> String {
+        let end = workout.startDate.addingTimeInterval(workout.duration)
+        let series = HealthKitSeries(streams: streams, workout: workout, workoutEnd: end)
+        return try await save(workout, samples: series.samples(), events: series.lapEvents(), locations: series.locations())
+    }
+
+    private func save(_ workout: NormalizedWorkout,
+                      samples: [HKSample],
+                      events: [HKWorkoutEvent],
+                      locations: [CLLocation]) async throws -> String {
         let config = HKWorkoutConfiguration()
         config.activityType = workout.sportType.hkActivityType
+        config.locationType = workout.isTrainer ? .indoor : .outdoor
 
-        let builder = HKWorkoutBuilder(healthStore: store, configuration: config, device: .local())
+        let device = HKDevice(name: workout.deviceName ?? "Intervals.icu", manufacturer: nil, model: nil,
+                              hardwareVersion: nil, firmwareVersion: nil, softwareVersion: nil,
+                              localIdentifier: nil, udiDeviceIdentifier: nil)
+        let builder = HKWorkoutBuilder(healthStore: store, configuration: config, device: device)
         let start = workout.startDate
         let end = start.addingTimeInterval(workout.duration)
 
         try await builder.beginCollection(at: start)
-
-        let samples = timeSeriesSamples(from: streams, workout: workout, workoutEnd: end)
-        if !samples.isEmpty {
-            try await addSamples(samples, to: builder)
+        var chunkStart = 0
+        while chunkStart < samples.count {
+            let chunkEnd = min(chunkStart + 5_000, samples.count)
+            try await addSamples(Array(samples[chunkStart..<chunkEnd]), to: builder)
+            chunkStart = chunkEnd
+        }
+        if !events.isEmpty {
+            try await addEvents(events, to: builder)
         }
         try await addMetadata(workoutMetadata(for: workout), to: builder)
         try await builder.endCollection(at: end)
         guard let finished = try await builder.finishWorkout() else {
             throw AdapterError.uploadFailed("finishWorkout returned nil")
         }
+
+        // A route failure must not fail the upload, or a retry would duplicate the saved workout.
+        if !locations.isEmpty {
+            do {
+                let routeBuilder = HKWorkoutRouteBuilder(healthStore: store, device: device)
+                try await routeBuilder.insertRouteData(locations)
+                try await routeBuilder.finishRoute(with: finished, metadata: nil)
+            } catch {
+                print("[HealthKitAdapter] Route save failed for \(finished.uuid): \(error)")
+            }
+        }
+
+        print("[HealthKitAdapter] Saved \(finished.uuid): \(samples.count) samples, \(events.count) laps, \(locations.count) route points")
         return finished.uuid.uuidString
     }
 
@@ -130,7 +211,7 @@ actor HealthKitAdapter: ConnectionAdapter {
 
     private func aggregateSamples(for workout: NormalizedWorkout, start: Date, end: Date) -> [HKSample] {
         var samples: [HKSample] = []
-        let isCycling = workout.sportType.hkActivityType == .cycling
+        let isCycling = workout.sportType.isCycling
 
         if let hr = workout.avgHeartRate {
             samples.append(HKQuantitySample(
@@ -167,14 +248,8 @@ actor HealthKitAdapter: ConnectionAdapter {
         }
 
         if let meters = workout.distance {
-            let distID: HKQuantityTypeIdentifier
-            switch workout.sportType.hkActivityType {
-            case .cycling:  distID = .distanceCycling
-            case .swimming: distID = .distanceSwimming
-            default:        distID = .distanceWalkingRunning
-            }
             samples.append(HKQuantitySample(
-                type: HKQuantityType(distID),
+                type: HKQuantityType(workout.sportType.hkDistanceType),
                 quantity: HKQuantity(unit: .meter(), doubleValue: meters),
                 start: start, end: end
             ))
@@ -191,78 +266,30 @@ actor HealthKitAdapter: ConnectionAdapter {
         return samples
     }
 
-    private func timeSeriesSamples(from streams: ActivityStreams,
-                                   workout: NormalizedWorkout,
-                                   workoutEnd: Date) -> [HKSample] {
-        var samples: [HKSample] = []
-        let base = streams.startDate
-        let times = streams.time
-        let isCycling = workout.sportType.hkActivityType == .cycling
-
-        // Returns (sampleStart, sampleEnd) for index i
-        func window(_ i: Int) -> (Date, Date) {
-            let s = base.addingTimeInterval(TimeInterval(times[i]))
-            let e = i + 1 < times.count
-                ? base.addingTimeInterval(TimeInterval(times[i + 1]))
-                : workoutEnd
-            return (s, e)
-        }
-
-        if let hrs = streams.heartRate {
-            let unit = HKUnit.count().unitDivided(by: .minute())
-            for i in 0..<min(hrs.count, times.count) {
-                let (s, e) = window(i)
-                samples.append(HKQuantitySample(
-                    type: HKQuantityType(.heartRate),
-                    quantity: HKQuantity(unit: unit, doubleValue: Double(hrs[i])),
-                    start: s, end: e
-                ))
-            }
-        }
-
-        if let watts = streams.watts {
-            let powerID: HKQuantityTypeIdentifier = isCycling ? .cyclingPower : .runningPower
-            for i in 0..<min(watts.count, times.count) {
-                guard watts[i] > 0 else { continue }  // skip zero-power coasting points
-                let (s, e) = window(i)
-                samples.append(HKQuantitySample(
-                    type: HKQuantityType(powerID),
-                    quantity: HKQuantity(unit: .watt(), doubleValue: Double(watts[i])),
-                    start: s, end: e
-                ))
-            }
-        }
-
-        if let cadences = streams.cadence, isCycling {
-            for i in 0..<min(cadences.count, times.count) {
-                let (s, e) = window(i)
-                samples.append(HKQuantitySample(
-                    type: HKQuantityType(.cyclingCadence),
-                    quantity: HKQuantity(unit: HKUnit(from: "count/min"), doubleValue: Double(cadences[i])),
-                    start: s, end: e
-                ))
-            }
-        }
-
-        if let velocities = streams.velocity {
-            let speedID: HKQuantityTypeIdentifier = isCycling ? .cyclingSpeed : .runningSpeed
-            for i in 0..<min(velocities.count, times.count) {
-                let (s, e) = window(i)
-                samples.append(HKQuantitySample(
-                    type: HKQuantityType(speedID),
-                    quantity: HKQuantity(unit: .meter().unitDivided(by: .second()), doubleValue: velocities[i]),
-                    start: s, end: e
-                ))
-            }
-        }
-
-        return samples
-    }
-
     private func workoutMetadata(for workout: NormalizedWorkout) -> [String: Any] {
-        var meta: [String: Any] = [HKMetadataKeyIndoorWorkout: workout.isTrainer]
+        var meta: [String: Any] = [
+            HKMetadataKeyIndoorWorkout: workout.isTrainer,
+            HKMetadataKeyExternalUUID: "\(workout.source.rawValue):\(workout.externalID)",
+            "RelayWorkoutName": workout.name,
+        ]
+        if let timeZone = workout.timeZone {
+            meta[HKMetadataKeyTimeZone] = timeZone.identifier
+        }
         if let np = workout.normalizedPower {
             meta["NormalizedPower"] = np
+        }
+        if let maxHR = workout.maxHeartRate {
+            meta["MaxHeartRate"] = maxHR
+        }
+        let speedUnit = HKUnit.meter().unitDivided(by: .second())
+        if let avgSpeed = workout.avgSpeed {
+            meta[HKMetadataKeyAverageSpeed] = HKQuantity(unit: speedUnit, doubleValue: avgSpeed)
+        }
+        if let maxSpeed = workout.maxSpeed {
+            meta[HKMetadataKeyMaximumSpeed] = HKQuantity(unit: speedUnit, doubleValue: maxSpeed)
+        }
+        if let elevation = workout.elevationGain {
+            meta[HKMetadataKeyElevationAscended] = HKQuantity(unit: .meter(), doubleValue: elevation)
         }
         return meta
     }
@@ -272,6 +299,14 @@ actor HealthKitAdapter: ConnectionAdapter {
     private func addSamples(_ samples: [HKSample], to builder: HKWorkoutBuilder) async throws {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
             builder.add(samples) { _, error in
+                if let error { cont.resume(throwing: error) } else { cont.resume() }
+            }
+        }
+    }
+
+    private func addEvents(_ events: [HKWorkoutEvent], to builder: HKWorkoutBuilder) async throws {
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Void, Error>) in
+            builder.addWorkoutEvents(events) { _, error in
                 if let error { cont.resume(throwing: error) } else { cont.resume() }
             }
         }
@@ -289,7 +324,7 @@ actor HealthKitAdapter: ConnectionAdapter {
 // MARK: - HKWorkout → NormalizedWorkout
 
 private extension HKWorkout {
-    func toNormalized() -> NormalizedWorkout {
+    nonisolated func toNormalized() -> NormalizedWorkout {
         let calories = statistics(for: HKQuantityType(.activeEnergyBurned))?
             .sumQuantity()
             .map { Int($0.doubleValue(for: .kilocalorie())) }
@@ -358,10 +393,47 @@ private extension HKWorkout {
     }
 }
 
-// MARK: - SportType → HKWorkoutActivityType
+// MARK: - HKWorkoutActivityType → SportType
 
-private extension SportType {
-    var hkActivityType: HKWorkoutActivityType {
+extension HKWorkoutActivityType {
+    nonisolated var relaySportType: SportType {
+        switch self {
+        case .cycling:                   return .ride
+        case .running:                   return .run
+        case .swimming:                  return .swim
+        case .walking:                   return .walk
+        case .hiking:                    return .hike
+        case .yoga:                      return .yoga
+        case .rowing:                    return .rowing
+        case .elliptical:                return .elliptical
+        case .crossTraining, .functionalStrengthTraining,
+             .traditionalStrengthTraining:  return .workout
+        case .highIntensityIntervalTraining: return .hiit
+        default:                         return .other
+        }
+    }
+
+    nonisolated var relayDisplayName: String {
+        relaySportType.displayName
+    }
+}
+
+// MARK: - SportType → HealthKit types
+
+extension SportType {
+    nonisolated var isCycling: Bool {
+        [.ride, .mountainBike, .virtualRide].contains(self)
+    }
+
+    nonisolated var hkDistanceType: HKQuantityTypeIdentifier {
+        switch self {
+        case .ride, .virtualRide, .mountainBike: return .distanceCycling
+        case .swim, .openWaterSwim:              return .distanceSwimming
+        default:                                  return .distanceWalkingRunning
+        }
+    }
+
+    nonisolated var hkActivityType: HKWorkoutActivityType {
         switch self {
         case .ride, .mountainBike, .virtualRide:    return .cycling
         case .run, .trailRun, .virtualRun:          return .running

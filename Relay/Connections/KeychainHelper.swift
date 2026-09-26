@@ -4,10 +4,11 @@
 //
 
 import Foundation
-import Security
+@preconcurrency import Security
 
 enum KeychainHelper {
 
+    @preconcurrency
     static func set(_ value: String, forKey key: String) {
         let data = Data(value.utf8)
         let query: [CFString: Any] = [
@@ -20,6 +21,7 @@ enum KeychainHelper {
         SecItemAdd(query as CFDictionary, nil)
     }
 
+    @preconcurrency
     static func get(forKey key: String) -> String? {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,
@@ -34,6 +36,7 @@ enum KeychainHelper {
         return String(data: data, encoding: .utf8)
     }
 
+    @preconcurrency
     static func delete(forKey key: String) {
         let query: [CFString: Any] = [
             kSecClass: kSecClassGenericPassword,

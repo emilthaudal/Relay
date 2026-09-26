@@ -7,7 +7,6 @@
 //
 
 import Foundation
-import HealthKit
 
 enum SportType: String, Codable, CaseIterable, Identifiable {
     // Cycling
@@ -41,10 +40,10 @@ enum SportType: String, Codable, CaseIterable, Identifiable {
     // Other
     case other
 
-    var id: String { rawValue }
+    nonisolated var id: String { rawValue }
 
     /// Human-readable display name.
-    var displayName: String {
+    nonisolated var displayName: String {
         switch self {
         case .ride:          return "Ride"
         case .virtualRide:   return "Virtual Ride"
@@ -67,7 +66,7 @@ enum SportType: String, Codable, CaseIterable, Identifiable {
     }
 
     /// SF Symbol name for sport icon.
-    var symbolName: String {
+    nonisolated var symbolName: String {
         switch self {
         case .ride, .virtualRide, .mountainBike: return "bicycle"
         case .run, .trailRun, .virtualRun:       return "figure.run"
@@ -83,8 +82,8 @@ enum SportType: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Strava activity type string (as returned by Strava API).
-    var stravaType: String {
+    /// Activity type string as returned by the Intervals.icu API.
+    nonisolated var intervalsType: String {
         switch self {
         case .ride:          return "Ride"
         case .virtualRide:   return "VirtualRide"
@@ -106,33 +105,16 @@ enum SportType: String, Codable, CaseIterable, Identifiable {
         }
     }
 
-    /// Initialize from a Strava activity type string.
-    init(stravaType: String) {
-        self = SportType.allCases.first { $0.stravaType == stravaType } ?? .other
-    }
-}
-
-// MARK: - HKWorkoutActivityType → SportType
-
-extension HKWorkoutActivityType {
-    var relaySportType: SportType {
-        switch self {
-        case .cycling:                   return .ride
-        case .running:                   return .run
-        case .swimming:                  return .swim
-        case .walking:                   return .walk
-        case .hiking:                    return .hike
-        case .yoga:                      return .yoga
-        case .rowing:                    return .rowing
-        case .elliptical:                return .elliptical
-        case .crossTraining, .functionalStrengthTraining,
-             .traditionalStrengthTraining:  return .workout
-        case .highIntensityIntervalTraining: return .hiit
-        default:                         return .other
+    nonisolated init(intervalsType: String) {
+        switch intervalsType {
+        case "GravelRide", "EBikeRide":
+            self = .ride
+        case "EMountainBikeRide":
+            self = .mountainBike
+        case "VirtualRide", "IndoorCycling":
+            self = .virtualRide
+        default:
+            self = SportType.allCases.first { $0.intervalsType == intervalsType } ?? .other
         }
-    }
-
-    var relayDisplayName: String {
-        relaySportType.displayName
     }
 }

@@ -16,7 +16,7 @@ struct WorkoutMatcherTests {
         start: Date = Date(),
         duration: TimeInterval = 3600,
         sport: SportType = .ride,
-        source: ConnectionType = .strava,
+        source: ConnectionType = .hammerhead,
         id: String = UUID().uuidString
     ) -> NormalizedWorkout {
         NormalizedWorkout(
@@ -40,45 +40,31 @@ struct WorkoutMatcherTests {
         #expect(WorkoutMatcher.matches(a, b))
     }
 
-    @Test("time within 60s tolerance matches")
+    @Test("start within 5 min tolerance matches")
     func timeWithinTolerance() {
         let a = workout(start: base, duration: 3600)
-        let b = workout(start: base.addingTimeInterval(59), duration: 3600, source: .intervals)
+        let b = workout(start: base.addingTimeInterval(300), duration: 3600, source: .intervals)
         #expect(WorkoutMatcher.matches(a, b))
     }
 
-    @Test("time exactly at 60s boundary matches")
-    func timeAtBoundary() {
-        let a = workout(start: base, duration: 3600)
-        let b = workout(start: base.addingTimeInterval(60), duration: 3600, source: .intervals)
-        #expect(WorkoutMatcher.matches(a, b))
-    }
-
-    @Test("time beyond 60s tolerance does not match")
+    @Test("start beyond 5 min tolerance does not match")
     func timeExceedsTolerance() {
         let a = workout(start: base, duration: 3600)
-        let b = workout(start: base.addingTimeInterval(61), duration: 3600, source: .intervals)
+        let b = workout(start: base.addingTimeInterval(301), duration: 3600, source: .intervals)
         #expect(!WorkoutMatcher.matches(a, b))
     }
 
-    @Test("duration within 120s tolerance matches")
-    func durationWithinTolerance() {
-        let a = workout(start: base, duration: 3600)
-        let b = workout(start: base, duration: 3600 + 119, source: .intervals)
-        #expect(WorkoutMatcher.matches(a, b))
+    @Test("moving-time copy of an elapsed-time recording matches")
+    func movingVersusElapsedTime() {
+        let elapsed = workout(start: base, duration: 9707)
+        let moving = workout(start: base, duration: 8932, source: .healthKit)
+        #expect(WorkoutMatcher.matches(elapsed, moving))
     }
 
-    @Test("duration exactly at 120s boundary matches")
-    func durationAtBoundary() {
-        let a = workout(start: base, duration: 3600)
-        let b = workout(start: base, duration: 3600 + 120, source: .intervals)
-        #expect(WorkoutMatcher.matches(a, b))
-    }
-
-    @Test("duration beyond 120s tolerance does not match")
-    func durationExceedsTolerance() {
-        let a = workout(start: base, duration: 3600)
-        let b = workout(start: base, duration: 3600 + 121, source: .intervals)
+    @Test("short workout overlapping less than half of the shorter one does not match")
+    func insufficientOverlap() {
+        let a = workout(start: base, duration: 600)
+        let b = workout(start: base.addingTimeInterval(299), duration: 3600, source: .intervals)
         #expect(!WorkoutMatcher.matches(a, b))
     }
 
@@ -129,7 +115,7 @@ struct WorkoutMatcherTests {
 
     @Test("two matching workouts form one cluster")
     func twoMatchingWorkouts() {
-        let a = workout(start: base, source: .strava)
+        let a = workout(start: base, source: .hammerhead)
         let b = workout(start: base, source: .intervals)
         let clusters = WorkoutMatcher.cluster([a, b])
         #expect(clusters.count == 1)
@@ -146,9 +132,9 @@ struct WorkoutMatcherTests {
 
     @Test("three workouts — two matching, one separate — form two clusters")
     func mixedClusters() {
-        let a = workout(start: base, duration: 3600, sport: .ride, source: .strava, id: "a")
+        let a = workout(start: base, duration: 3600, sport: .ride, source: .hammerhead, id: "a")
         let b = workout(start: base.addingTimeInterval(30), duration: 3600, sport: .ride, source: .intervals, id: "b")
-        let c = workout(start: base.addingTimeInterval(7200), duration: 1800, sport: .run, source: .strava, id: "c")
+        let c = workout(start: base.addingTimeInterval(7200), duration: 1800, sport: .run, source: .hammerhead, id: "c")
         let clusters = WorkoutMatcher.cluster([a, b, c])
         #expect(clusters.count == 2)
         let sizes = clusters.map(\.count).sorted()

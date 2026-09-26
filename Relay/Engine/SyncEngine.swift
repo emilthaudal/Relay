@@ -4,7 +4,7 @@
 //
 //  Central orchestrator: fetches workouts from all enabled adapters, clusters/merges them,
 //  persists WorkoutRecords + SyncRecords to SwiftData, then uploads to HealthKit.
-//  Streams (per-second time-series) are fetched from Strava/Intervals.icu and written to
+//  Streams (per-second time-series) are fetched from Intervals.icu and written to
 //  HealthKit when available; falls back to aggregate stats if streams are unavailable.
 //
 
@@ -23,7 +23,6 @@ final class SyncEngine {
     // MARK: - Adapters
 
     private let healthKit  = HealthKitAdapter()
-    private let strava     = StravaAdapter()
     private let intervals  = IntervalsAdapter()
 
     // MARK: - Public API
@@ -42,6 +41,53 @@ final class SyncEngine {
         }
     }
 
+    /// Exports a single workout to the given destination, re-queueing it if previously synced.
+    func exportWorkout(record: WorkoutRecord, to destination: ConnectionType, context: ModelContext) async {
+        guard !isSyncing else { return }
+        isSyncing = true
+        lastError = nil
+        defer { isSyncing = false }
+
+        if let existing = record.syncRecords.first(where: { $0.connection == destination }) {
+            existing.state = .pending
+            existing.errorMessage = nil
+        } else {
+            let syncRecord = SyncRecord(connection: destination, externalID: "", state: .pending, isPrimarySource: false)
+            syncRecord.workout = record
+            context.insert(syncRecord)
+        }
+        try? context.save()
+
+        switch destination {
+        case .healthKit:
+            await uploadToHealthKit(record: record)
+            try? context.save()
+        default:
+            record.syncRecords.first(where: { $0.connection == destination })?.markFailed(
+                error: AdapterError.networkError("Export to \(destination.displayName) is not yet supported")
+            )
+            try? context.save()
+        }
+    }
+
+    /// Syncs historical workouts going back `days` days, regardless of last sync date.
+    func syncHistorical(appState: AppState, context: ModelContext, days: Int) async {
+        guard !isSyncing else { return }
+        isSyncing = true
+        lastError = nil
+        defer { isSyncing = false }
+
+        let savedLastSync = lastSyncDate
+        lastSyncDate = Date().addingTimeInterval(-Double(days) * 24 * 3600)
+        do {
+            try await performSync(appState: appState, context: context)
+            lastSyncDate = Date()
+        } catch {
+            lastSyncDate = savedLastSync
+            lastError = error
+        }
+    }
+
     // MARK: - Core logic
 
     private func performSync(appState: AppState, context: ModelContext) async throws {
@@ -52,7 +98,6 @@ final class SyncEngine {
         for connection in appState.enabledConnections {
             let adapter: (any ConnectionAdapter)? = switch connection {
             case .healthKit:  healthKit
-            case .strava:     strava
             case .intervals:  intervals
             case .hammerhead: nil
             }
@@ -73,7 +118,8 @@ final class SyncEngine {
         try context.save()
 
         // 3. Upload to HealthKit for any workout that's still pending there
-        guard appState.enabledConnections.contains(.healthKit) else { return }
+        guard appState.enabledConnections.contains(.healthKit),
+              appState.autoSyncToHealthKit else { return }
 
         let allRecords = (try? context.fetch(FetchDescriptor<WorkoutRecord>())) ?? []
         let pendingForHK = allRecords.filter { record in
@@ -121,15 +167,6 @@ final class SyncEngine {
                               activityID: String,
                               startDate: Date) async -> ActivityStreams? {
         switch connection {
-        case .strava:
-            do {
-                let s = try await strava.fetchStreams(activityID: activityID, startDate: startDate)
-                print("[SyncEngine] Strava streams OK: \(s.time.count) samples")
-                return s
-            } catch {
-                print("[SyncEngine] Strava streams failed: \(error)")
-                return nil
-            }
         case .intervals:
             do {
                 let s = try await intervals.fetchStreams(activityID: activityID, startDate: startDate)
@@ -175,6 +212,8 @@ final class SyncEngine {
         }()
 
         // Update all metrics (higher-priority source may have richer data now)
+        record.timeZoneID      = merged.timeZone?.identifier
+        record.deviceName      = merged.deviceName
         record.distance        = merged.distance
         record.calories        = merged.calories
         record.avgHeartRate    = merged.avgHeartRate
@@ -230,6 +269,8 @@ extension WorkoutRecord {
             sportType: sportType,
             name: name,
             isTrainer: isTrainer,
+            timeZone: timeZoneID.flatMap(TimeZone.init(identifier:)),
+            deviceName: deviceName,
             distance: distance,
             calories: calories,
             avgHeartRate: avgHeartRate,

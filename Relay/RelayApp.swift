@@ -14,11 +14,31 @@ struct RelayApp: App {
     let container: ModelContainer
 
     init() {
+        let schema = Schema([WorkoutRecord.self, SyncRecord.self, AppState.self])
+        let config = ModelConfiguration(schema: schema)
         do {
-            container = try ModelContainer(for: WorkoutRecord.self, SyncRecord.self, AppState.self)
+            container = try ModelContainer(for: schema, configurations: config)
         } catch {
-            fatalError("Failed to create ModelContainer: \(error)")
+            // Schema migration failed (e.g. new non-optional attribute on existing store).
+            // Delete the store and recreate — all data can be re-synced from connected services.
+            let storeURL = config.url
+            try? FileManager.default.removeItem(at: storeURL)
+            // Also remove SQLite WAL/SHM sidecars (named "default.store-wal", etc.)
+            let dir = storeURL.deletingLastPathComponent()
+            let base = storeURL.lastPathComponent
+            for suffix in ["-wal", "-shm"] {
+                try? FileManager.default.removeItem(at: dir.appendingPathComponent(base + suffix))
+            }
+            do {
+                container = try ModelContainer(for: schema, configurations: config)
+            } catch {
+                fatalError("Failed to create ModelContainer: \(error)")
+            }
         }
+
+        #if DEBUG
+        IntervalsAdapter.seedCredentialsFromBundleIfNeeded()
+        #endif
 
         #if os(iOS)
         BackgroundSyncTask.shared.registerHandlers()

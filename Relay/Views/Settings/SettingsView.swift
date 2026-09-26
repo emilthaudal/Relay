@@ -13,6 +13,7 @@ struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var engine = SyncEngine()
     @State private var isSyncing = false
+    @State private var showingHistoricalSync = false
 
     var body: some View {
         NavigationStack {
@@ -27,13 +28,18 @@ struct SettingsView: View {
                     }
                 }
 
-                // Source Priority
+                // Sync
                 Section("Sync") {
                     NavigationLink {
                         SourcePrioritySettingsView()
                             .environment(appState)
                     } label: {
                         Label("Source Priority", systemImage: "arrow.up.arrow.down")
+                    }
+
+                    @Bindable var bindable = appState
+                    Toggle(isOn: $bindable.autoSyncToHealthKit) {
+                        Label("Auto-sync to Apple Health", systemImage: "heart.fill")
                     }
 
                     Button {
@@ -48,6 +54,13 @@ struct SettingsView: View {
                             Spacer()
                             if isSyncing { ProgressView().controlSize(.small) }
                         }
+                    }
+                    .disabled(isSyncing)
+
+                    Button {
+                        showingHistoricalSync = true
+                    } label: {
+                        Label("Sync Historical Workouts", systemImage: "clock.arrow.trianglehead.counterclockwise.rotate.90")
                     }
                     .disabled(isSyncing)
 
@@ -68,6 +81,32 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .confirmationDialog("Sync Historical Workouts", isPresented: $showingHistoricalSync, titleVisibility: .visible) {
+                Button("Last 90 days") {
+                    Task {
+                        isSyncing = true
+                        await engine.syncHistorical(appState: appState, context: modelContext, days: 90)
+                        isSyncing = false
+                    }
+                }
+                Button("Last 6 months") {
+                    Task {
+                        isSyncing = true
+                        await engine.syncHistorical(appState: appState, context: modelContext, days: 180)
+                        isSyncing = false
+                    }
+                }
+                Button("Last year") {
+                    Task {
+                        isSyncing = true
+                        await engine.syncHistorical(appState: appState, context: modelContext, days: 365)
+                        isSyncing = false
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will fetch workouts from all connected services for the selected time range.")
+            }
         }
     }
 }

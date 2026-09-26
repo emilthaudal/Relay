@@ -6,11 +6,17 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct WorkoutDetailView: View {
     let workout: WorkoutRecord
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+    @Environment(AppState.self) private var appState
+
+    @State private var engine = SyncEngine()
+    @State private var showingExportSheet = false
 
     var body: some View {
         NavigationStack {
@@ -44,6 +50,16 @@ struct WorkoutDetailView: View {
                         }
                     }
                 }
+
+                // Export action
+                Section {
+                    Button {
+                        showingExportSheet = true
+                    } label: {
+                        Label(engine.isSyncing ? "Exporting…" : "Export Workout", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(engine.isSyncing)
+                }
             }
             .navigationTitle(workout.name)
             .navigationBarTitleDisplayMode(.inline)
@@ -52,7 +68,23 @@ struct WorkoutDetailView: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .confirmationDialog("Export to", isPresented: $showingExportSheet, titleVisibility: .visible) {
+                ForEach(exportDestinations, id: \.self) { destination in
+                    Button(destination.displayName) {
+                        Task {
+                            await engine.exportWorkout(record: workout, to: destination, context: modelContext)
+                        }
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            }
         }
+    }
+
+    private var exportDestinations: [ConnectionType] {
+        appState.enabledConnections
+            .filter { $0.isAvailable && $0 != workout.primarySource }
+            .sorted { $0.rawValue < $1.rawValue }
     }
 
     // MARK: - Subviews

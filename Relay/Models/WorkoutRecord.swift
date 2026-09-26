@@ -20,6 +20,8 @@ final class WorkoutRecord {
     var sportTypeRaw: String            // SportType.rawValue
     var name: String
     var isTrainer: Bool
+    var timeZoneID: String?
+    var deviceName: String?
 
     // MARK: - Metrics (all optional)
 
@@ -53,6 +55,10 @@ final class WorkoutRecord {
         if syncRecords.contains(where: { $0.state == .uploading }) { return .uploading }
         if syncRecords.contains(where: { $0.state == .pending })   { return .pending }
         return .synced
+    }
+
+    var primarySource: ConnectionType? {
+        syncRecords.first(where: { $0.isPrimarySource })?.connection
     }
 
     // MARK: - Init

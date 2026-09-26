@@ -2,7 +2,7 @@
 //  OnboardingAddConnectionsView.swift
 //  Relay
 //
-//  Step 3: Add Strava and Intervals.icu connections.
+//  Step 3: Add the Intervals.icu connection.
 //
 
 import SwiftUI
@@ -72,6 +72,7 @@ private struct ConnectionRow: View {
 
     @State private var isConnecting = false
     @State private var errorMessage: String?
+    @State private var showIntervalsSheet = false
 
     private var isEnabled: Bool {
         appState.enabledConnections.contains(connection)
@@ -110,45 +111,36 @@ private struct ConnectionRow: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
+        .sheet(isPresented: $showIntervalsSheet) {
+            IntervalsCredentialsView(onConnected: {
+                appState.enabledConnections.insert(.intervals)
+            })
+        }
     }
 
     private func connect() {
+        guard connection == .intervals else { return }
         isConnecting = true
         errorMessage = nil
         Task {
-            do {
-                switch connection {
-                case .strava:
-                    let adapter = StravaAdapter()
-                    try await adapter.authenticate()
-                case .intervals:
-                    let adapter = IntervalsAdapter()
-                    try await adapter.authenticate()
-                default:
-                    break
-                }
-                await MainActor.run {
-                    appState.enabledConnections.insert(connection)
-                    isConnecting = false
-                }
-            } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    isConnecting = false
-                }
+            let adapter = IntervalsAdapter()
+            if await adapter.isConnected, (try? await adapter.authenticate()) != nil {
+                appState.enabledConnections.insert(.intervals)
+            } else {
+                showIntervalsSheet = true
             }
+            isConnecting = false
         }
     }
 
     private func disconnect() {
         Task {
             switch connection {
-            case .strava:    await StravaAdapter().disconnect()
             case .intervals: await IntervalsAdapter().disconnect()
             default: break
             }
             await MainActor.run {
-                appState.enabledConnections.remove(connection)
+                _ = appState.enabledConnections.remove(connection)
             }
         }
     }
