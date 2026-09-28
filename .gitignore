@@ -1,8 +1,3 @@
-
-# Dolt database files (added by bd init)
-.dolt/
-*.db
-
 # macOS
 .DS_Store
 .AppleDouble
@@ -80,13 +75,3 @@ TestResults/
 *.swp
 *.swo
 *~
-
-# bv (beads viewer) local config and caches
-.bv/
-
-# Beads / Dolt files (added by bd init)
-.beads-credential-key
-.beads/proxieddb/
-
-# Ephemeral exports
-issue-export.jsonl

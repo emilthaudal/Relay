@@ -219,4 +219,4 @@ All steps are re-accessible from **Settings → Connections** and **Settings →
 - [ ] Add connection card to `OnboardingAddConnectionsView`
 - [ ] Add connection row to `ConnectionsSettingsView`
 - [ ] Add source priority defaults to `SourcePriority.swift`
-- [ ] Add a Beads task for the integration work (`bd create`)
+- [ ] Add a Linear issue for the integration work under the Relay V1 initiative

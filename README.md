@@ -106,9 +106,4 @@ xcodebuild test \
 
 ## Issue Tracking
 
-This project uses [bd (beads)](https://github.com/anomalyco/beads) for issue tracking. The `.beads/` directory is committed to the repo.
-
-```sh
-bd ready    # see available work
-bd show <id>
-```
+Issues are tracked in Linear under the **Relay V1** initiative.
