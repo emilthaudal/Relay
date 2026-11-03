@@ -61,6 +61,14 @@ struct SettingsView: View {
                     }
                     .disabled(isSyncing)
 
+                    if let progress = engine.progress, progress.total > 0 {
+                        ProgressView(value: Double(progress.saved), total: Double(progress.total)) {
+                            Text("\(progress.saved) of \(progress.total) saved to Apple Health")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+
                     if let last = appState.lastSyncDate {
                         LabeledContent("Last Sync") {
                             Text(last, style: .relative)
@@ -91,12 +99,13 @@ struct SettingsView: View {
             .confirmationDialog("Sync Historical Workouts", isPresented: $showingHistoricalSync, titleVisibility: .visible) {
                 ForEach([(label: "Last 90 days", days: 90), ("Last 6 months", 180), ("Last year", 365)], id: \.days) { option in
                     Button(option.label) {
-                        Task { await engine.syncHistorical(appState: appState, context: modelContext, days: option.days) }
+                        BackgroundSyncTask.shared.startHistoricalSync(days: option.days, label: option.label,
+                                                                      appState: appState, context: modelContext)
                     }
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
-                Text("This will fetch workouts from all connected services for the selected time range.")
+                Text("Saves your Intervals.icu workouts from this period to Apple Health. It keeps going if you leave Relay, with progress on the Lock Screen.")
             }
         }
     }

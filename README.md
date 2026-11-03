@@ -44,7 +44,9 @@ Use a test device, or delete one copy between runs: Relay skips a workout that's
 
 ### Background sync
 
-Relay syncs when opened (if the last sync is more than 15 minutes old) and in the background through `BGAppRefreshTask` (`emtb.Relay.refresh`, declared in `Config/Relay-Info.plist`). iOS decides when background refresh runs. To trigger it from the debugger, pause the app and run:
+Relay syncs when opened (if the last sync is more than 15 minutes old) and in the background through `BGAppRefreshTask` (`emtb.Relay.refresh`, declared in `Config/Relay-Info.plist`). iOS decides when background refresh runs.
+
+**Sync Historical Workouts** runs as a `BGContinuedProcessingTask` (`emtb.Relay.historical.<uuid>`, permitted as `emtb.Relay.historical.*`). It keeps running after you leave the app, and iOS shows its progress as a Live Activity. If iOS won't start the task right away, the sync runs in the app instead. To trigger it from the debugger, pause the app and run:
 
 ```
 e -l objc -- (void)[[BGTaskScheduler sharedScheduler] _simulateLaunchForTaskWithIdentifier:@"emtb.Relay.refresh"]

@@ -30,6 +30,14 @@ final class SyncEngine {
     /// Intervals.icu activities skipped in the last sync because they were imported from
     /// Strava, whose data the Intervals.icu API doesn't serve.
     private(set) var skippedFromStrava = 0
+    /// Workouts saved to Health so far in the running sync, out of how many need saving.
+    /// Nil while fetching, and when no sync is running.
+    private(set) var progress: SyncProgress?
+
+    struct SyncProgress: Equatable {
+        var saved: Int
+        var total: Int
+    }
 
     // MARK: - Adapters
 
@@ -79,20 +87,28 @@ final class SyncEngine {
     }
 
     /// Syncs historical workouts going back `days` days, regardless of last sync date.
-    func syncHistorical(appState: AppState, context: ModelContext, days: Int) async {
+    /// `onProgress` gets each change of `progress`, for the system's progress UI.
+    func syncHistorical(appState: AppState, context: ModelContext, days: Int,
+                        onProgress: ((SyncProgress) -> Void)? = nil) async {
         guard !isSyncing else { return }
         isSyncing = true
         lastError = nil
         defer { isSyncing = false }
 
-        await run(since: Date().addingTimeInterval(-Double(days) * 24 * 3600), appState: appState, context: context)
+        await run(since: Date().addingTimeInterval(-Double(days) * 24 * 3600), appState: appState, context: context,
+                  onProgress: onProgress)
     }
 
     // MARK: - Core logic
 
-    private func run(since: Date, appState: AppState, context: ModelContext) async {
+    private func run(since: Date, appState: AppState, context: ModelContext,
+                     onProgress: ((SyncProgress) -> Void)? = nil) async {
+        defer { progress = nil }
         do {
-            try await performSync(since: since, appState: appState, context: context)
+            try await performSync(since: since, appState: appState, context: context) { [weak self] update in
+                self?.progress = update
+                onProgress?(update)
+            }
             appState.lastSyncDate = Date()
             try? context.save()
         } catch {
@@ -102,7 +118,8 @@ final class SyncEngine {
         }
     }
 
-    private func performSync(since: Date, appState: AppState, context: ModelContext) async throws {
+    private func performSync(since: Date, appState: AppState, context: ModelContext,
+                             report: (SyncProgress) -> Void) async throws {
         // 1. Fetch from all enabled adapters
         var allWorkouts: [NormalizedWorkout] = []
         var fetchErrors: [String] = []
@@ -146,10 +163,12 @@ final class SyncEngine {
             record.syncRecords.contains { $0.connection == .healthKit && $0.state == .pending }
         }
 
-        for record in pendingForHK {
+        report(SyncProgress(saved: 0, total: pendingForHK.count))
+        for (index, record) in pendingForHK.enumerated() {
             try Task.checkCancellation()
             await uploadToHealthKit(record: record)
             try? context.save()
+            report(SyncProgress(saved: index + 1, total: pendingForHK.count))
         }
 
         if !fetchErrors.isEmpty {
