@@ -17,9 +17,6 @@ struct ConnectionsSettingsView: View {
                     SettingsConnectionRow(connection: connection)
                         .environment(appState)
                 }
-            } footer: {
-                Text("Hammerhead integration is planned for a future release.")
-                    .font(.caption)
             }
         }
         .navigationTitle("Connections")

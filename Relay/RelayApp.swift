@@ -41,7 +41,7 @@ struct RelayApp: App {
         #endif
 
         #if os(iOS)
-        BackgroundSyncTask.shared.registerHandlers()
+        BackgroundSyncTask.shared.registerHandlers(container: container)
         BackgroundSyncTask.shared.scheduleNextRefresh()
         #endif
     }
@@ -58,23 +58,50 @@ struct RelayApp: App {
 
 private struct RootView: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @Query private var appStates: [AppState]
 
     private var appState: AppState? { appStates.first }
 
+    /// Opening the app syncs when the last sync is older than this.
+    private let foregroundSyncInterval: TimeInterval = 15 * 60
+
     var body: some View {
-        if let appState {
-            if appState.onboardingCompleted {
-                MainTabView()
-                    .environment(appState)
+        Group {
+            if let appState {
+                if appState.onboardingCompleted {
+                    MainTabView()
+                        .environment(appState)
+                } else {
+                    OnboardingWelcomeView()
+                        .environment(appState)
+                }
             } else {
-                OnboardingWelcomeView()
-                    .environment(appState)
+                ProgressView("Loading…")
+                    .onAppear { ensureAppState() }
             }
-        } else {
-            ProgressView("Loading…")
-                .onAppear { ensureAppState() }
         }
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            switch phase {
+            case .active:
+                syncIfStale()
+            case .background:
+                #if os(iOS)
+                BackgroundSyncTask.shared.scheduleNextRefresh()
+                #endif
+            default:
+                break
+            }
+        }
+        .onChange(of: appState?.onboardingCompleted) { _, completed in
+            if completed == true { syncIfStale() }
+        }
+    }
+
+    private func syncIfStale() {
+        guard let appState, appState.onboardingCompleted else { return }
+        if let last = appState.lastSyncDate, Date().timeIntervalSince(last) < foregroundSyncInterval { return }
+        Task { await SyncEngine.shared.sync(appState: appState, context: modelContext) }
     }
 
     /// Insert an AppState row on first launch so RootView can route correctly.

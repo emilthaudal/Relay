@@ -1,0 +1,24 @@
+<svg viewBox="0 0 1024 1024" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- Concept D, "Relay pass", from icon-concepts.html. Render to Relay/Assets.xcassets/AppIcon.appiconset/AppIcon.png. -->
+  <defs>
+    <linearGradient id="bg-d" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fdfcff"/>
+      <stop offset="100%" stop-color="#ece7f8"/>
+    </linearGradient>
+    <!-- userSpaceOnUse: a horizontal line has a zero-height bounding box, which disables a bounding-box gradient. -->
+    <linearGradient id="line-d" gradientUnits="userSpaceOnUse" x1="220" y1="512" x2="804" y2="512">
+      <stop offset="0%" stop-color="#b89fec"/>
+      <stop offset="100%" stop-color="#7c5abf"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#bg-d)"/>
+  <line x1="220" y1="512" x2="804" y2="512" stroke="url(#line-d)" stroke-width="40" stroke-linecap="round"/>
+  <circle cx="220" cy="512" r="88" fill="#c2aef0"/>
+  <circle cx="220" cy="512" r="52" fill="white"/>
+  <circle cx="804" cy="512" r="88" fill="#7c5abf"/>
+  <circle cx="804" cy="512" r="52" fill="white"/>
+  <polygon points="640,460 780,512 640,564" fill="#9370d8"/>
+  <line x1="120" y1="440" x2="175" y2="440" stroke="#c2aef0" stroke-width="20" stroke-linecap="round" opacity="0.5"/>
+  <line x1="100" y1="512" x2="165" y2="512" stroke="#c2aef0" stroke-width="20" stroke-linecap="round" opacity="0.35"/>
+  <line x1="120" y1="584" x2="175" y2="584" stroke="#c2aef0" stroke-width="20" stroke-linecap="round" opacity="0.5"/>
+</svg>

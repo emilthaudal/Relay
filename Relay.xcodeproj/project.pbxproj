@@ -285,12 +285,13 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_IntervalsAPIKey = "$(INTERVALS_API_KEY)";
 				INFOPLIST_KEY_IntervalsAthleteID = "$(INTERVALS_ATHLETE_ID)";
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Relay reads your workouts from Apple Health to sync them across your connected fitness platforms.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Relay writes workouts to Apple Health from your connected fitness platforms.";
+				INFOPLIST_FILE = "Config/Relay-Info.plist";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Relay reads your workouts, workout routes, heart rate, distance, active energy, power, cadence and speed from Apple Health, so it doesn't add a workout you already have and can show its stats. Nothing leaves your iPhone.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Relay saves your Intervals.icu workouts to Apple Health, with heart rate, power, cadence, speed, distance, active energy, laps and the GPS route.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -305,7 +306,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -321,12 +322,13 @@
 				DEVELOPMENT_TEAM = BQSWK4U73N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSHealthShareUsageDescription = "Relay reads your workouts from Apple Health to sync them across your connected fitness platforms.";
-				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Relay writes workouts to Apple Health from your connected fitness platforms.";
+				INFOPLIST_FILE = "Config/Relay-Info.plist";
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_NSHealthShareUsageDescription = "Relay reads your workouts, workout routes, heart rate, distance, active energy, power, cadence and speed from Apple Health, so it doesn't add a workout you already have and can show its stats. Nothing leaves your iPhone.";
+				INFOPLIST_KEY_NSHealthUpdateUsageDescription = "Relay saves your Intervals.icu workouts to Apple Health, with heart rate, power, cadence, speed, distance, active energy, laps and the GPS route.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -341,7 +343,7 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -483,7 +485,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Relay.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Relay";
 			};
 			name = Debug;
@@ -505,7 +507,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Relay.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Relay";
 			};
 			name = Release;
@@ -525,7 +527,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_TARGET_NAME = Relay;
 			};
 			name = Debug;
@@ -545,7 +547,7 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 				TEST_TARGET_NAME = Relay;
 			};
 			name = Release;

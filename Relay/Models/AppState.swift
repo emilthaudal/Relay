@@ -22,6 +22,9 @@ final class AppState {
     /// When true, imported workouts are automatically uploaded to HealthKit after each sync.
     var autoSyncToHealthKit: Bool
 
+    /// When the last sync finished without errors. Optional, so existing stores migrate.
+    var lastSyncDate: Date?
+
     // MARK: - Connections
 
     /// Raw values of enabled ConnectionTypes.

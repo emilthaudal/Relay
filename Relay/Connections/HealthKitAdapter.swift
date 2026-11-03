@@ -165,6 +165,13 @@ actor HealthKitAdapter: ConnectionAdapter {
                       samples: [HKSample],
                       events: [HKWorkoutEvent],
                       locations: [CLLocation]) async throws -> String {
+        // Relay's own store can be lost (reinstall, or the reset in RelayApp after a failed
+        // migration). Health keeps the external ID, so check it before writing a second copy.
+        if let existing = try await existingWorkout(externalUUID: Self.externalUUID(for: workout)) {
+            print("[HealthKitAdapter] Already in Health as \(existing.uuid); not writing again")
+            return existing.uuid.uuidString
+        }
+
         let config = HKWorkoutConfiguration()
         config.activityType = workout.sportType.hkActivityType
         config.locationType = workout.isTrainer ? .indoor : .outdoor
@@ -205,6 +212,17 @@ actor HealthKitAdapter: ConnectionAdapter {
 
         print("[HealthKitAdapter] Saved \(finished.uuid): \(samples.count) samples, \(events.count) laps, \(locations.count) route points")
         return finished.uuid.uuidString
+    }
+
+    nonisolated static func externalUUID(for workout: NormalizedWorkout) -> String {
+        "\(workout.source.rawValue):\(workout.externalID)"
+    }
+
+    private func existingWorkout(externalUUID: String) async throws -> HKWorkout? {
+        let predicate = HKQuery.predicateForObjects(withMetadataKey: HKMetadataKeyExternalUUID,
+                                                    allowedValues: [externalUUID])
+        let descriptor = HKSampleQueryDescriptor(predicates: [.workout(predicate)], sortDescriptors: [], limit: 1)
+        return try await descriptor.result(for: store).first
     }
 
     // MARK: - Sample builders
@@ -269,7 +287,7 @@ actor HealthKitAdapter: ConnectionAdapter {
     private func workoutMetadata(for workout: NormalizedWorkout) -> [String: Any] {
         var meta: [String: Any] = [
             HKMetadataKeyIndoorWorkout: workout.isTrainer,
-            HKMetadataKeyExternalUUID: "\(workout.source.rawValue):\(workout.externalID)",
+            HKMetadataKeyExternalUUID: Self.externalUUID(for: workout),
             "RelayWorkoutName": workout.name,
         ]
         if let timeZone = workout.timeZone {

@@ -63,8 +63,9 @@ struct WorkoutMatcherTests {
 
     @Test("short workout overlapping less than half of the shorter one does not match")
     func insufficientOverlap() {
-        let a = workout(start: base, duration: 600)
-        let b = workout(start: base.addingTimeInterval(299), duration: 3600, source: .intervals)
+        // Starts 250 s apart (inside the 5-minute window) but share only 150 s of a's 400 s.
+        let a = workout(start: base, duration: 400)
+        let b = workout(start: base.addingTimeInterval(250), duration: 3600, source: .intervals)
         #expect(!WorkoutMatcher.matches(a, b))
     }
 

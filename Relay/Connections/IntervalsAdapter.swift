@@ -95,8 +95,12 @@ actor IntervalsAdapter: ConnectionAdapter {
 
         let activities = try JSONDecoder().decode([IntervalsActivity].self, from: data)
         let athleteTimeZone = await fetchAthleteTimeZone(athleteID: id)
+        lastSkippedFromStrava = activities.filter(\.isStravaStub).count
         return activities.compactMap { $0.toNormalized(athleteTimeZone: athleteTimeZone) }
     }
+
+    /// Activities in the last fetch that were imported from Strava and so couldn't be read.
+    private(set) var lastSkippedFromStrava = 0
 
     private func fetchAthleteTimeZone(athleteID: String) async -> TimeZone? {
         let request = await makeRequest(path: "athlete/\(athleteID)")
@@ -240,8 +244,13 @@ nonisolated struct IntervalsActivity: Decodable {
 
     /// Returns nil for activities that can't or shouldn't be imported: Strava-sourced stubs
     /// (the API withholds their data) and Apple Watch recordings that already live in Health.
+    /// Imported from Strava: the API withholds the data and adds a `_note` saying so.
+    nonisolated var isStravaStub: Bool {
+        _note != nil || source == "STRAVA"
+    }
+
     nonisolated func toNormalized(athleteTimeZone: TimeZone?) -> NormalizedWorkout? {
-        guard _note == nil, source != "STRAVA",
+        guard !isStravaStub,
               let type, let elapsed_time, let start_date,
               let start = ISO8601DateFormatter().date(from: start_date)
         else { return nil }

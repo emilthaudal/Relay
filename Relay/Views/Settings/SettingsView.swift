@@ -11,9 +11,10 @@ import SwiftData
 struct SettingsView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
-    @State private var engine = SyncEngine()
-    @State private var isSyncing = false
+    private let engine = SyncEngine.shared
     @State private var showingHistoricalSync = false
+
+    private var isSyncing: Bool { engine.isSyncing }
 
     var body: some View {
         NavigationStack {
@@ -43,11 +44,7 @@ struct SettingsView: View {
                     }
 
                     Button {
-                        Task {
-                            isSyncing = true
-                            await engine.sync(appState: appState, context: modelContext)
-                            isSyncing = false
-                        }
+                        Task { await engine.sync(appState: appState, context: modelContext) }
                     } label: {
                         HStack {
                             Label("Sync Now", systemImage: "arrow.triangle.2.circlepath")
@@ -64,13 +61,23 @@ struct SettingsView: View {
                     }
                     .disabled(isSyncing)
 
-                    if let last = engine.lastSyncDate {
+                    if let last = appState.lastSyncDate {
                         LabeledContent("Last Sync") {
                             Text(last, style: .relative)
                                 .foregroundStyle(.secondary)
                         }
                     }
                 }
+
+                #if DEBUG
+                Section("Developer") {
+                    NavigationLink {
+                        HealthInspectorView()
+                    } label: {
+                        Label("Health Inspector", systemImage: "stethoscope")
+                    }
+                }
+                #endif
 
                 // About
                 Section("About") {
@@ -82,25 +89,9 @@ struct SettingsView: View {
             }
             .navigationTitle("Settings")
             .confirmationDialog("Sync Historical Workouts", isPresented: $showingHistoricalSync, titleVisibility: .visible) {
-                Button("Last 90 days") {
-                    Task {
-                        isSyncing = true
-                        await engine.syncHistorical(appState: appState, context: modelContext, days: 90)
-                        isSyncing = false
-                    }
-                }
-                Button("Last 6 months") {
-                    Task {
-                        isSyncing = true
-                        await engine.syncHistorical(appState: appState, context: modelContext, days: 180)
-                        isSyncing = false
-                    }
-                }
-                Button("Last year") {
-                    Task {
-                        isSyncing = true
-                        await engine.syncHistorical(appState: appState, context: modelContext, days: 365)
-                        isSyncing = false
+                ForEach([(label: "Last 90 days", days: 90), ("Last 6 months", 180), ("Last year", 365)], id: \.days) { option in
+                    Button(option.label) {
+                        Task { await engine.syncHistorical(appState: appState, context: modelContext, days: option.days) }
                     }
                 }
                 Button("Cancel", role: .cancel) {}

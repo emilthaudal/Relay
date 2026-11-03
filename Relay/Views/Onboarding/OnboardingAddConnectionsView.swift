@@ -22,7 +22,7 @@ struct OnboardingAddConnectionsView: View {
                 Text("Add Connections")
                     .font(.title.bold())
 
-                Text("Connect your other fitness accounts. You can add or remove connections any time in Settings.")
+                Text("Connect Intervals.icu, where Relay finds your rides and runs. You can change this any time in Settings.")
                     .font(.body)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)

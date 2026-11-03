@@ -13,9 +13,12 @@ enum AdapterError: LocalizedError {
     case networkError(String)
     case parseError(String)
     case uploadFailed(String)
+    /// One or more connections couldn't be read during a sync; one line per connection.
+    case fetchFailed(String)
 
     var errorDescription: String? {
         switch self {
+        case .fetchFailed(let msg):  return "Couldn't read from:\n\(msg)"
         case .unavailable(let msg):  return "Unavailable: \(msg)"
         case .authFailed(let msg):   return "Authentication failed: \(msg)"
         case .networkError(let msg): return "Network error: \(msg)"

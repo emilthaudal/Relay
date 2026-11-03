@@ -14,7 +14,7 @@ struct WorkoutListView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \WorkoutRecord.startDate, order: .reverse) private var workouts: [WorkoutRecord]
 
-    @State private var engine = SyncEngine()
+    private let engine = SyncEngine.shared
     @State private var showingWorkout: WorkoutRecord?
 
     var body: some View {
@@ -51,6 +51,7 @@ struct WorkoutListView: View {
 
     private var list: some View {
         List {
+            SyncNoticesSection(engine: engine)
             ForEach(workouts) { workout in
                 Button { showingWorkout = workout } label: {
                     WorkoutRow(workout: workout)
@@ -62,11 +63,40 @@ struct WorkoutListView: View {
     }
 
     private var emptyState: some View {
-        ContentUnavailableView(
-            "No Workouts",
-            systemImage: "figure.run",
-            description: Text("Tap the sync button to fetch workouts from your connected services.")
-        )
+        VStack(alignment: .leading, spacing: 12) {
+            SyncNoticesSection(engine: engine)
+                .padding(.horizontal)
+            ContentUnavailableView(
+                "No Workouts",
+                systemImage: "figure.run",
+                description: Text("Tap the sync button to fetch workouts from your connected services.")
+            )
+        }
+    }
+}
+
+// MARK: - Sync notices
+
+/// The last sync's error, and activities Relay had to skip.
+private struct SyncNoticesSection: View {
+    let engine: SyncEngine
+
+    var body: some View {
+        if let error = engine.lastError {
+            Label {
+                Text(error.localizedDescription).font(.footnote)
+            } icon: {
+                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+            }
+        }
+        if engine.skippedFromStrava > 0 {
+            Label {
+                Text("\(engine.skippedFromStrava) Intervals.icu \(engine.skippedFromStrava == 1 ? "activity was" : "activities were") skipped because \(engine.skippedFromStrava == 1 ? "it was" : "they were") imported from Strava. Strava doesn't let Intervals.icu share that data. Connect your device or Zwift to Intervals.icu directly to sync these rides.")
+                    .font(.footnote)
+            } icon: {
+                Image(systemName: "info.circle").foregroundStyle(.secondary)
+            }
+        }
     }
 }
 

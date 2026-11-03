@@ -22,7 +22,7 @@ struct OnboardingDoneView: View {
                 Text("You're All Set!")
                     .font(.largeTitle.bold())
 
-                Text("Relay will keep your workouts in sync across all connected services — even in the background.")
+                Text("Relay checks Intervals.icu for new workouts when you open it, and from time to time in the background, and saves them to Apple Health.")
                     .font(.body)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)

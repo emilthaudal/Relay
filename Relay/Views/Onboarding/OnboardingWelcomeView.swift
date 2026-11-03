@@ -24,7 +24,7 @@ struct OnboardingWelcomeView: View {
                     Text("Welcome to Relay")
                         .font(.largeTitle.bold())
 
-                    Text("Relay automatically syncs your workouts across all your fitness apps — so you record once and it appears everywhere.")
+                    Text("Relay copies your Intervals.icu workouts into Apple Health with all their detail: heart rate, power, cadence, speed, laps and the route.")
                         .font(.body)
                         .multilineTextAlignment(.center)
                         .foregroundStyle(.secondary)

@@ -29,7 +29,7 @@ struct OnboardingHealthKitView: View {
                 Text("Connect Apple Health")
                     .font(.title.bold())
 
-                Text("Relay reads and writes workouts from Apple Health. This is the foundation for all syncing.")
+                Text("Relay saves your workouts to Apple Health, and reads the workouts already there so it never adds one twice. Your health data stays on your iPhone.")
                     .font(.body)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(.secondary)

@@ -15,7 +15,7 @@ struct WorkoutDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(AppState.self) private var appState
 
-    @State private var engine = SyncEngine()
+    private let engine = SyncEngine.shared
     @State private var showingExportSheet = false
 
     var body: some View {
@@ -52,13 +52,15 @@ struct WorkoutDetailView: View {
                 }
 
                 // Export action
-                Section {
-                    Button {
-                        showingExportSheet = true
-                    } label: {
-                        Label(engine.isSyncing ? "Exporting…" : "Export Workout", systemImage: "square.and.arrow.up")
+                if !exportDestinations.isEmpty {
+                    Section {
+                        Button {
+                            showingExportSheet = true
+                        } label: {
+                            Label(engine.isSyncing ? "Exporting…" : "Export Workout", systemImage: "square.and.arrow.up")
+                        }
+                        .disabled(engine.isSyncing)
                     }
-                    .disabled(engine.isSyncing)
                 }
             }
             .navigationTitle(workout.name)
@@ -81,10 +83,10 @@ struct WorkoutDetailView: View {
         }
     }
 
+    /// Apple Health is the only connection Relay can write to.
     private var exportDestinations: [ConnectionType] {
-        appState.enabledConnections
-            .filter { $0.isAvailable && $0 != workout.primarySource }
-            .sorted { $0.rawValue < $1.rawValue }
+        guard appState.enabledConnections.contains(.healthKit), workout.primarySource != .healthKit else { return [] }
+        return [.healthKit]
     }
 
     // MARK: - Subviews

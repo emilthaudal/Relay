@@ -16,9 +16,20 @@ import SwiftData
 @MainActor
 final class SyncEngine {
 
+    /// One engine for the whole app, so the list, Settings and the background task
+    /// can't run two syncs at once and write the same workout twice.
+    static let shared = SyncEngine()
+
+    /// How far before the last sync each sync looks again. Intervals.icu filters by start
+    /// date, so a ride that started before the last sync but was uploaded after it would
+    /// otherwise be missed.
+    static let lookback: TimeInterval = 2 * 24 * 3600
+
     private(set) var isSyncing = false
-    private(set) var lastSyncDate: Date?
     private(set) var lastError: Error?
+    /// Intervals.icu activities skipped in the last sync because they were imported from
+    /// Strava, whose data the Intervals.icu API doesn't serve.
+    private(set) var skippedFromStrava = 0
 
     // MARK: - Adapters
 
@@ -33,12 +44,9 @@ final class SyncEngine {
         lastError = nil
         defer { isSyncing = false }
 
-        do {
-            try await performSync(appState: appState, context: context)
-            lastSyncDate = Date()
-        } catch {
-            lastError = error
-        }
+        let since = (appState.lastSyncDate ?? Date().addingTimeInterval(-30 * 24 * 3600))
+            .addingTimeInterval(-Self.lookback)
+        await run(since: since, appState: appState, context: context)
     }
 
     /// Exports a single workout to the given destination, re-queueing it if previously synced.
@@ -77,24 +85,27 @@ final class SyncEngine {
         lastError = nil
         defer { isSyncing = false }
 
-        let savedLastSync = lastSyncDate
-        lastSyncDate = Date().addingTimeInterval(-Double(days) * 24 * 3600)
-        do {
-            try await performSync(appState: appState, context: context)
-            lastSyncDate = Date()
-        } catch {
-            lastSyncDate = savedLastSync
-            lastError = error
-        }
+        await run(since: Date().addingTimeInterval(-Double(days) * 24 * 3600), appState: appState, context: context)
     }
 
     // MARK: - Core logic
 
-    private func performSync(appState: AppState, context: ModelContext) async throws {
-        let since = lastSyncDate ?? Date().addingTimeInterval(-30 * 24 * 3600)
+    private func run(since: Date, appState: AppState, context: ModelContext) async {
+        do {
+            try await performSync(since: since, appState: appState, context: context)
+            appState.lastSyncDate = Date()
+            try? context.save()
+        } catch {
+            // A cancelled sync is the background task running out of time, not a failure;
+            // the next sync picks up where this one stopped.
+            if !Task.isCancelled { lastError = error }
+        }
+    }
 
+    private func performSync(since: Date, appState: AppState, context: ModelContext) async throws {
         // 1. Fetch from all enabled adapters
         var allWorkouts: [NormalizedWorkout] = []
+        var fetchErrors: [String] = []
         for connection in appState.enabledConnections {
             let adapter: (any ConnectionAdapter)? = switch connection {
             case .healthKit:  healthKit
@@ -105,8 +116,17 @@ final class SyncEngine {
             do {
                 let fetched = try await adapter.fetchWorkouts(since: since)
                 allWorkouts.append(contentsOf: fetched)
+                if connection == .intervals {
+                    skippedFromStrava = await intervals.lastSkippedFromStrava
+                }
             } catch {
                 print("[SyncEngine] fetch failed for \(connection.displayName): \(error)")
+                fetchErrors.append("\(connection.displayName): \(error.localizedDescription)")
+                // Without Health's workouts, matching can't see what's already there, and
+                // uploading could write duplicates. Stop before persisting anything.
+                if connection == .healthKit {
+                    throw AdapterError.fetchFailed(fetchErrors.joined(separator: "\n"))
+                }
             }
         }
 
@@ -127,9 +147,14 @@ final class SyncEngine {
         }
 
         for record in pendingForHK {
+            try Task.checkCancellation()
             await uploadToHealthKit(record: record)
+            try? context.save()
         }
-        try? context.save()
+
+        if !fetchErrors.isEmpty {
+            throw AdapterError.fetchFailed(fetchErrors.joined(separator: "\n"))
+        }
     }
 
     // MARK: - HealthKit upload
