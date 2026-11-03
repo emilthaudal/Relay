@@ -22,6 +22,9 @@ final class WorkoutRecord {
     var isTrainer: Bool
     var timeZoneID: String?
     var deviceName: String?
+    /// "yyyy-MM" of `startDate`, which sections the workout list by month.
+    /// Optional so existing stores migrate; `SyncEngine` fills in older records.
+    var monthKey: String?
 
     // MARK: - Metrics (all optional)
 
@@ -77,6 +80,23 @@ final class WorkoutRecord {
         self.sportTypeRaw = sportType.rawValue
         self.name = name
         self.isTrainer = isTrainer
+        self.monthKey = Self.monthKey(for: startDate)
         self.syncRecords = []
+    }
+
+    // MARK: - Month sections
+
+    static func monthKey(for date: Date) -> String {
+        let parts = Calendar.current.dateComponents([.year, .month], from: date)
+        return String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
+    }
+
+    /// "October 2026" for "2026-10"; records not yet backfilled have an empty key.
+    static func monthTitle(for key: String) -> String {
+        let parts = key.split(separator: "-").compactMap { Int($0) }
+        guard parts.count == 2,
+              let date = Calendar.current.date(from: DateComponents(year: parts[0], month: parts[1]))
+        else { return "Earlier" }
+        return date.formatted(.dateTime.month(.wide).year())
     }
 }

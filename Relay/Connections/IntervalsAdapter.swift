@@ -123,7 +123,8 @@ actor IntervalsAdapter: ConnectionAdapter {
     func fetchStreams(activityID: String, startDate: Date) async throws -> ActivityStreams {
         var request = await makeRequest(path: "activity/\(activityID)/streams")
         request.url = request.url?.appending(queryItems: [
-            URLQueryItem(name: "types", value: "time,heartrate,watts,cadence,velocity_smooth,altitude,distance,latlng")
+            URLQueryItem(name: "types", value: "time,heartrate,watts,cadence,velocity_smooth,altitude,distance,latlng,"
+                         + "temp,stance_time,vertical_oscillation,step_length")
         ])
         let (data, response) = try await URLSession.shared.data(for: request)
         try validateResponse(response)
@@ -160,7 +161,11 @@ actor IntervalsAdapter: ConnectionAdapter {
             altitude:  streamMap["altitude"]?.data,
             distance:  streamMap["distance"]?.data,
             latitude:  streamMap["latlng"]?.data,
-            longitude: streamMap["latlng"]?.data2
+            longitude: streamMap["latlng"]?.data2,
+            temperature:         streamMap["temp"]?.data,
+            groundContactTime:   streamMap["stance_time"]?.data,
+            verticalOscillation: streamMap["vertical_oscillation"]?.data,
+            stepLength:          streamMap["step_length"]?.data
         )
     }
 
@@ -268,7 +273,8 @@ nonisolated struct IntervalsActivity: Decodable {
             duration: TimeInterval(elapsed_time),
             sportType: sport,
             name: name ?? sport.displayName,
-            isTrainer: trainer ?? (sport == .virtualRide || sport == .virtualRun),
+            // Virtual rides are always indoor: their coordinates are a game world, never a real route.
+            isTrainer: (trainer ?? false) || sport == .virtualRide || sport == .virtualRun,
             timeZone: timeZone(start: start, athleteTimeZone: athleteTimeZone),
             deviceName: device_name,
             distance: distance,

@@ -2,7 +2,7 @@
 //  WorkoutListView.swift
 //  Relay
 //
-//  Main list of persisted workouts, grouped by date. Shows sport icon, name,
+//  Main list of persisted workouts, in a section per month. Shows sport icon, name,
 //  duration and overall sync status badge per row.
 //
 
@@ -12,7 +12,8 @@ import SwiftData
 struct WorkoutListView: View {
     @Environment(AppState.self) private var appState
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \WorkoutRecord.startDate, order: .reverse) private var workouts: [WorkoutRecord]
+    @Query(sort: \WorkoutRecord.startDate, order: .reverse, sectionBy: \WorkoutRecord.monthKey)
+    private var months: SectionedResults<WorkoutRecord, String>
 
     private let engine = SyncEngine.shared
     @State private var showingWorkout: WorkoutRecord?
@@ -20,7 +21,7 @@ struct WorkoutListView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if workouts.isEmpty {
+                if months.isEmpty {
                     emptyState
                 } else {
                     list
@@ -52,11 +53,15 @@ struct WorkoutListView: View {
     private var list: some View {
         List {
             SyncNoticesSection(engine: engine)
-            ForEach(workouts) { workout in
-                Button { showingWorkout = workout } label: {
-                    WorkoutRow(workout: workout)
+            ForEach(months) { month in
+                Section(WorkoutRecord.monthTitle(for: month.title)) {
+                    ForEach(month) { workout in
+                        Button { showingWorkout = workout } label: {
+                            WorkoutRow(workout: workout)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .buttonStyle(.plain)
             }
         }
         .listStyle(.plain)
@@ -92,6 +97,14 @@ private struct SyncNoticesSection: View {
         if engine.skippedFromStrava > 0 {
             Label {
                 Text("\(engine.skippedFromStrava) Intervals.icu \(engine.skippedFromStrava == 1 ? "activity was" : "activities were") skipped because \(engine.skippedFromStrava == 1 ? "it was" : "they were") imported from Strava. Strava doesn't let Intervals.icu share that data. Connect your device or Zwift to Intervals.icu directly to sync these rides.")
+                    .font(.footnote)
+            } icon: {
+                Image(systemName: "info.circle").foregroundStyle(.secondary)
+            }
+        }
+        if engine.heldBackBeforeHealthAccess > 0, let from = engine.healthReadableFrom {
+            Label {
+                Text("\(engine.heldBackBeforeHealthAccess) \(engine.heldBackBeforeHealthAccess == 1 ? "workout" : "workouts") from before \(from.formatted(date: .abbreviated, time: .omitted)) weren't saved. Apple Health only lets Relay read workouts from that date, so it can't check whether they're already there. To include them, allow all data in Settings → Health → Data Access & Devices → Relay.")
                     .font(.footnote)
             } icon: {
                 Image(systemName: "info.circle").foregroundStyle(.secondary)

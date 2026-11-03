@@ -33,6 +33,10 @@ final class SyncEngine {
     /// Workouts saved to Health so far in the running sync, out of how many need saving.
     /// Nil while fetching, and when no sync is running.
     private(set) var progress: SyncProgress?
+    /// The earliest date Health lets Relay read from, when the user limited access by date.
+    private(set) var healthReadableFrom: Date?
+    /// Workouts not saved because they're older than `healthReadableFrom`.
+    private(set) var heldBackBeforeHealthAccess = 0
 
     struct SyncProgress: Equatable {
         var saved: Int
@@ -152,6 +156,10 @@ final class SyncEngine {
         for cluster in clusters {
             upsert(cluster: cluster, appState: appState, into: context)
         }
+        // Records saved before the list was sectioned by month have no key yet.
+        for record in (try? context.fetch(FetchDescriptor<WorkoutRecord>(predicate: #Predicate { $0.monthKey == nil }))) ?? [] {
+            record.monthKey = WorkoutRecord.monthKey(for: record.startDate)
+        }
         try context.save()
 
         // 3. Upload to HealthKit for any workout that's still pending there
@@ -159,9 +167,18 @@ final class SyncEngine {
               appState.autoSyncToHealthKit else { return }
 
         let allRecords = (try? context.fetch(FetchDescriptor<WorkoutRecord>())) ?? []
-        let pendingForHK = allRecords.filter { record in
+        let pending = allRecords.filter { record in
             record.syncRecords.contains { $0.connection == .healthKit && $0.state == .pending }
         }
+
+        // With limited Health access (iOS 27), Relay can't see workouts before the user's
+        // chosen date, so it can't tell whether an older one is already there. Leave those
+        // pending; they go once the user widens access.
+        healthReadableFrom = await healthKit.earliestReadableWorkoutDate()
+        let pendingForHK = pending.filter { record in
+            healthReadableFrom.map { record.startDate >= $0 } ?? true
+        }
+        heldBackBeforeHealthAccess = pending.count - pendingForHK.count
 
         report(SyncProgress(saved: 0, total: pendingForHK.count))
         for (index, record) in pendingForHK.enumerated() {

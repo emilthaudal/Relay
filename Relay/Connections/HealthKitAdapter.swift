@@ -45,10 +45,27 @@ actor HealthKitAdapter: ConnectionAdapter {
         ]
         let readTypes: Set<HKObjectType> = Set(quantityTypes.map { HKQuantityType($0) as HKObjectType })
             .union([HKObjectType.workoutType(), HKSeriesType.workoutRoute()])
-        let writeTypes: Set<HKSampleType> = Set(quantityTypes.map { HKQuantityType($0) as HKSampleType })
+        let writeTypes: Set<HKSampleType> = Set((quantityTypes + Self.writeOnlyTypes).map { HKQuantityType($0) as HKSampleType })
             .union([HKObjectType.workoutType(), HKSeriesType.workoutRoute()])
 
+        // Prompts only for types the user hasn't answered yet, so it's cheap to call again
+        // after an update adds types.
         try await store.requestAuthorization(toShare: writeTypes, read: readTypes)
+    }
+
+    /// Written from runs, never read back.
+    private static let writeOnlyTypes: [HKQuantityTypeIdentifier] = [
+        .stepCount,
+        .runningGroundContactTime,
+        .runningVerticalOscillation,
+        .runningStrideLength,
+    ]
+
+    /// The earliest date Health lets Relay read workouts from, when the user granted
+    /// limited access (iOS 27). Nil when access isn't limited by date.
+    func earliestReadableWorkoutDate() async -> Date? {
+        let type = HKObjectType.workoutType()
+        return try? await store.earliestAuthorizedSampleDate(for: [type])[type]
     }
 
     func disconnect() async {
@@ -158,19 +175,26 @@ actor HealthKitAdapter: ConnectionAdapter {
     func uploadWithStreams(_ workout: NormalizedWorkout, streams: ActivityStreams) async throws -> String {
         let end = workout.startDate.addingTimeInterval(workout.duration)
         let series = HealthKitSeries(streams: streams, workout: workout, workoutEnd: end)
-        return try await save(workout, samples: series.samples(), events: series.lapEvents(), locations: series.locations())
+        return try await save(workout, samples: series.samples(), events: series.lapEvents(),
+                              locations: series.locations(), extraMetadata: series.metadata())
     }
 
     private func save(_ workout: NormalizedWorkout,
-                      samples: [HKSample],
+                      samples allSamples: [HKSample],
                       events: [HKWorkoutEvent],
-                      locations: [CLLocation]) async throws -> String {
+                      locations: [CLLocation],
+                      extraMetadata: [String: Any] = [:]) async throws -> String {
         // Relay's own store can be lost (reinstall, or the reset in RelayApp after a failed
         // migration). Health keeps the external ID, so check it before writing a second copy.
         if let existing = try await existingWorkout(externalUUID: Self.externalUUID(for: workout)) {
             print("[HealthKitAdapter] Already in Health as \(existing.uuid); not writing again")
             return existing.uuid.uuidString
         }
+
+        // One sample of a type the user hasn't allowed fails the whole workout, so write only
+        // allowed types. Types added in an update stay out until the user allows them.
+        let allowed = Set(allSamples.map(\.sampleType)).filter { store.authorizationStatus(for: $0) == .sharingAuthorized }
+        let samples = allSamples.filter { allowed.contains($0.sampleType) }
 
         let config = HKWorkoutConfiguration()
         config.activityType = workout.sportType.hkActivityType
@@ -193,7 +217,7 @@ actor HealthKitAdapter: ConnectionAdapter {
         if !events.isEmpty {
             try await addEvents(events, to: builder)
         }
-        try await addMetadata(workoutMetadata(for: workout), to: builder)
+        try await addMetadata(workoutMetadata(for: workout).merging(extraMetadata) { _, extra in extra }, to: builder)
         try await builder.endCollection(at: end)
         guard let finished = try await builder.finishWorkout() else {
             throw AdapterError.uploadFailed("finishWorkout returned nil")

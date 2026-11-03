@@ -48,6 +48,15 @@ struct IntervalsActivityTests {
         #expect(workout.timeZone?.secondsFromGMT() == 7200)
     }
 
+    @Test("a virtual ride is indoor even when the trainer flag says otherwise")
+    func virtualRideIsIndoor() throws {
+        let activity = try decode("""
+        {"id": "i5", "source": "ZWIFT", "type": "VirtualRide", "elapsed_time": 2400, "trainer": false,
+         "start_date": "2026-10-01T06:00:00Z"}
+        """)
+        #expect(try #require(activity.toNormalized(athleteTimeZone: nil)).isTrainer)
+    }
+
     @Test("an Apple Watch recording is skipped because it already lives in Health, but isn't a Strava stub")
     func appleWatch() throws {
         let activity = try decode("""

@@ -13,8 +13,8 @@ Karoo and Zwift rides reach Relay through Intervals.icu. Connect them to Interva
 
 ## Requirements
 
-- iPhone on iOS 26.2+
-- Xcode 26+
+- iPhone on iOS 27+
+- Xcode 27+
 - An Apple Developer account (the free tier works for device builds; TestFlight needs the paid program)
 
 ## Getting Started
@@ -108,7 +108,21 @@ xcodebuild test \
 ## Known Limitations
 
 - Relay writes only to Apple Health. Intervals.icu is read-only.
-- Running cadence, running dynamics (stride, oscillation, ground contact), swim strokes and weather aren't written yet. Compare with the Health Inspector to see what other apps write.
+- Health has no type for elevation over time, torque or pedal smoothness. Altitude goes into the GPS route, and the total climb into the workout's metadata; indoor rides have no route, so only the total climb is kept.
+- Swim strokes aren't written yet. Compare with the Health Inspector to see what other apps write.
+- With limited Health access (iOS 27), workouts before the user's chosen date stay pending: Relay can't see older Health workouts, so it can't rule out duplicates.
+
+## What Relay writes per workout
+
+| From Intervals.icu | To Apple Health |
+|---|---|
+| heartrate, watts, velocity_smooth | heart rate, cycling or running power, cycling or running speed (one sample per point) |
+| cadence | cycling cadence for rides; steps (2 × cadence) for runs, walks and hikes |
+| stance_time, vertical_oscillation, step_length | ground contact time, vertical oscillation, stride length (runs) |
+| distance, calories | distance and active energy, in 10-point buckets |
+| latlng, altitude | GPS route (outdoor only) |
+| temp | weather temperature, the average (outdoor only) |
+| laps (`icu_intervals`) | lap events |
 
 ## Issue Tracking
 

@@ -48,11 +48,13 @@ final class BackgroundSyncTask {
     func scheduleNextRefresh() {
         let request = BGAppRefreshTaskRequest(identifier: Self.identifier)
         request.earliestBeginDate = Date(timeIntervalSinceNow: minimumInterval)
-        do {
-            try BGTaskScheduler.shared.submit(request)
-        } catch {
-            // Fails in the simulator and when Background App Refresh is off.
-            print("[BackgroundSyncTask] Couldn't schedule refresh: \(error)")
+        Task {
+            do {
+                try await BGTaskScheduler.shared.submitTaskRequest(request)
+            } catch {
+                // Fails in the simulator and when Background App Refresh is off.
+                print("[BackgroundSyncTask] Couldn't schedule refresh: \(error)")
+            }
         }
     }
 
@@ -81,12 +83,14 @@ final class BackgroundSyncTask {
                                                        subtitle: label)
         // Start now or not at all: the user is waiting, and a queued request would surprise them later.
         request.strategy = .fail
-        do {
-            guard registered else { throw BGTaskScheduler.Error(.notPermitted) }
-            try BGTaskScheduler.shared.submit(request)
-        } catch {
-            print("[BackgroundSyncTask] Continued processing unavailable (\(error)); syncing in the app")
-            Task { await SyncEngine.shared.syncHistorical(appState: appState, context: context, days: days) }
+        Task {
+            do {
+                guard registered else { throw BGTaskScheduler.Error(.notPermitted) }
+                try await BGTaskScheduler.shared.submitTaskRequest(request)
+            } catch {
+                print("[BackgroundSyncTask] Continued processing unavailable (\(error)); syncing in the app")
+                await SyncEngine.shared.syncHistorical(appState: appState, context: context, days: days)
+            }
         }
     }
 

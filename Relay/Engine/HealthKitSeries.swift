@@ -21,7 +21,24 @@ nonisolated struct HealthKitSeries {
     private var count: Int { streams.time.count }
 
     func samples() -> [HKSample] {
-        discreteSamples() + distanceSamples() + energySamples()
+        discreteSamples() + distanceSamples() + energySamples() + stepSamples()
+    }
+
+    /// Runs, walks and hikes: Intervals.icu's cadence counts one foot, and Health stores
+    /// cadence as steps (the Fitness app derives steps per minute from them).
+    private var isOnFoot: Bool {
+        [.run, .trailRun, .virtualRun, .walk, .hike].contains(workout.sportType)
+    }
+
+    /// Metadata only the streams carry.
+    func metadata() -> [String: Any] {
+        var meta: [String: Any] = [:]
+        // A head unit indoors reads the room, not the weather.
+        if !workout.isTrainer, let temps = streams.temperature?.compactMap({ $0 }), !temps.isEmpty {
+            let mean = temps.reduce(0, +) / Double(temps.count)
+            meta[HKMetadataKeyWeatherTemperature] = HKQuantity(unit: .degreeCelsius(), doubleValue: mean)
+        }
+        return meta
     }
 
     // MARK: - Discrete quantities (one sample per stream point)
@@ -44,6 +61,18 @@ nonisolated struct HealthKitSeries {
         }
         if let velocity = streams.velocity, isCycling || isRunning {
             series.append((velocity, isCycling ? .cyclingSpeed : .runningSpeed, metersPerSecond, 0...50))
+        }
+        // Running form. Intervals.icu reports oscillation and step length in mm.
+        if isRunning {
+            if let stance = streams.groundContactTime {
+                series.append((stance, .runningGroundContactTime, .secondUnit(with: .milli), 50...1500))
+            }
+            if let oscillation = streams.verticalOscillation {
+                series.append((oscillation, .runningVerticalOscillation, .meterUnit(with: .milli), 10...300))
+            }
+            if let stepLength = streams.stepLength {
+                series.append((stepLength, .runningStrideLength, .meterUnit(with: .milli), 100...3000))
+            }
         }
 
         var samples: [HKSample] = []
@@ -100,6 +129,28 @@ nonisolated struct HealthKitSeries {
             let kcal = Double(total) * weight / weightSum
             guard kcal > 0, let interval = bucketInterval(bucket) else { return nil }
             return HKQuantitySample(type: type, quantity: HKQuantity(unit: .kilocalorie(), doubleValue: kcal),
+                                    start: interval.start, end: interval.end)
+        }
+    }
+
+    /// Steps from cadence: each point covers the time until the next one at `2 × cadence`
+    /// steps per minute, summed per bucket.
+    private func stepSamples() -> [HKSample] {
+        guard isOnFoot, let cadence = streams.cadence else { return [] }
+        let type = HKQuantityType(.stepCount)
+        // Whole steps per bucket, rounded on the running total so rounding doesn't add up.
+        var exactTotal = 0.0
+        var writtenTotal = 0.0
+        return buckets().compactMap { bucket in
+            exactTotal += bucket.dropLast().reduce(0.0) { total, i in
+                guard let spm = cadence[safe: i] ?? nil, (0...150).contains(spm) else { return total }
+                let seconds = Double(streams.time[i + 1] - streams.time[i])
+                return total + 2 * spm * seconds / 60
+            }
+            let steps = exactTotal.rounded() - writtenTotal
+            guard steps >= 1, let interval = bucketInterval(bucket) else { return nil }
+            writtenTotal += steps
+            return HKQuantitySample(type: type, quantity: HKQuantity(unit: .count(), doubleValue: steps),
                                     start: interval.start, end: interval.end)
         }
     }

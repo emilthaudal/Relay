@@ -101,7 +101,14 @@ private struct RootView: View {
     private func syncIfStale() {
         guard let appState, appState.onboardingCompleted else { return }
         if let last = appState.lastSyncDate, Date().timeIntervalSince(last) < foregroundSyncInterval { return }
-        Task { await SyncEngine.shared.sync(appState: appState, context: modelContext) }
+        Task {
+            // After an update adds Health types, ask for them before syncing. Shows nothing
+            // when every type has been answered already.
+            if appState.enabledConnections.contains(.healthKit) {
+                try? await HealthKitAdapter().authenticate()
+            }
+            await SyncEngine.shared.sync(appState: appState, context: modelContext)
+        }
     }
 
     /// Insert an AppState row on first launch so RootView can route correctly.
